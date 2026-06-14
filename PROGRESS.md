@@ -6,7 +6,7 @@ Plan source:
 - `docs/PRD.md`
 - `docs/TECH_SPEC.md`
 
-Current status: Step 8 complete; implementation commits in progress.
+Current status: Step 9 complete; implementation commits in progress.
 
 Update rule: after each completed plan step, update this file with the completed step,
 validation results, commit reference when available, current status, and the next step.
@@ -22,7 +22,7 @@ validation results, commit reference when available, current status, and the nex
 - [x] Step 6: Scope Recommendation And Target Path Resolution
 - [x] Step 7: Embedded Generation Template And Agent Invocation
 - [x] Step 8: Draft Workspace, Editor, And Validation
-- [ ] Step 9: Final Skill Writes And Draft Cleanup
+- [x] Step 9: Final Skill Writes And Draft Cleanup
 - [ ] Step 10: End-To-End Interactive Session Coverage
 - [ ] Step 11: Release And npm Publishing Automation
 - [ ] Step 12: Production Readiness Documentation And Final MVP Audit
@@ -89,5 +89,12 @@ validation results, commit reference when available, current status, and the nex
 
 - Status: complete.
 - Validation: atomic file writes, editor fallback, built-in SKILL.md structural validation, warnings, and optional agnix integration added.
-- Commit: pending.
+- Commit: `ec71ede feat: validate editable skill drafts`.
 - Next step: Step 9, final skill writes and draft cleanup.
+
+### Step 9
+
+- Status: complete.
+- Validation: same-content final writes, parent directory creation after approval, final path output, and draft cleanup choice are implemented.
+- Commit: pending.
+- Next step: Step 10, end-to-end interactive session coverage.
