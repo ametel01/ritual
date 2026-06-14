@@ -6,7 +6,7 @@ Plan source:
 - `docs/PRD.md`
 - `docs/TECH_SPEC.md`
 
-Current status: Step 0 complete; implementation commits in progress.
+Current status: Step 1 complete; implementation commits in progress.
 
 Update rule: after each completed plan step, update this file with the completed step,
 validation results, commit reference when available, current status, and the next step.
@@ -14,7 +14,7 @@ validation results, commit reference when available, current status, and the nex
 ## Checklist
 
 - [x] Step 0: Progress Tracking Setup
-- [ ] Step 1: Quality Gates Setup
+- [x] Step 1: Quality Gates Setup
 - [ ] Step 2: CLI Entry Flow Skeleton
 - [ ] Step 3: History Discovery And Prompt Extraction
 - [ ] Step 4: Prompt Normalization, Clustering, And Ranking
@@ -33,5 +33,12 @@ validation results, commit reference when available, current status, and the nex
 
 - Status: complete.
 - Validation: confirmed this file exists, includes every planned step, and documents the update rule.
-- Commit: not created in this working session.
+- Commit: `4cedcd4 docs: add implementation progress tracking`.
 - Next step: Step 1, quality gates setup.
+
+### Step 1
+
+- Status: complete.
+- Validation: npm project scaffold, strict TypeScript config, Biome, Vitest, CI, and aggregate scripts added.
+- Commit: pending.
+- Next step: Step 2, CLI entry flow skeleton.

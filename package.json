@@ -1,0 +1,43 @@
+{
+  "name": "ritual",
+  "version": "0.1.0",
+  "description": "Interactive CLI that turns repeated Claude and Codex prompts into reusable skills.",
+  "type": "module",
+  "bin": {
+    "ritual": "./dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "verify": "npm run check && npm run typecheck && npm run test && npm run build"
+  },
+  "keywords": [
+    "agent",
+    "cli",
+    "claude",
+    "codex",
+    "skills"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.10.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}
