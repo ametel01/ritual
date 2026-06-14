@@ -6,7 +6,7 @@ Plan source:
 - `docs/PRD.md`
 - `docs/TECH_SPEC.md`
 
-Current status: Step 11 complete; implementation commits in progress.
+Current status: MVP implemented and validated locally.
 
 Update rule: after each completed plan step, update this file with the completed step,
 validation results, commit reference when available, current status, and the next step.
@@ -25,7 +25,7 @@ validation results, commit reference when available, current status, and the nex
 - [x] Step 9: Final Skill Writes And Draft Cleanup
 - [x] Step 10: End-To-End Interactive Session Coverage
 - [x] Step 11: Release And npm Publishing Automation
-- [ ] Step 12: Production Readiness Documentation And Final MVP Audit
+- [x] Step 12: Production Readiness Documentation And Final MVP Audit
 
 ## Update Log
 
@@ -110,5 +110,16 @@ validation results, commit reference when available, current status, and the nex
 
 - Status: complete.
 - Validation: release workflow triggers on `v*` tags, runs `npm ci`, `npm run verify`, package dry-run, npm publish with provenance, and GitHub Release creation.
-- Commit: pending.
+- Commit: `d8a5d4d ci: add npm release automation`.
 - Next step: Step 12, production readiness documentation and final MVP audit.
+
+### Step 12
+
+- Status: complete.
+- Validation:
+  - `npm run verify`
+  - `npm pack --dry-run`
+  - `npm exec -- ritual --bogus` confirmed the built local executable starts and rejects unsupported flags without scanning real history.
+  - `node --input-type=module -e "import { nodeCommandRunner } from './dist/system/exec.js'; ..."` confirmed local command discovery works without shell warnings.
+- Commit: pending.
+- Next step: release review, tag, and publish when ready.
