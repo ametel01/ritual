@@ -6,7 +6,7 @@ Plan source:
 - `docs/PRD.md`
 - `docs/TECH_SPEC.md`
 
-Current status: Step 5 complete; implementation commits in progress.
+Current status: Step 6 complete; implementation commits in progress.
 
 Update rule: after each completed plan step, update this file with the completed step,
 validation results, commit reference when available, current status, and the next step.
@@ -19,7 +19,7 @@ validation results, commit reference when available, current status, and the nex
 - [x] Step 3: History Discovery And Prompt Extraction
 - [x] Step 4: Prompt Normalization, Clustering, And Ranking
 - [x] Step 5: Candidate Review Interaction
-- [ ] Step 6: Scope Recommendation And Target Path Resolution
+- [x] Step 6: Scope Recommendation And Target Path Resolution
 - [ ] Step 7: Embedded Generation Template And Agent Invocation
 - [ ] Step 8: Draft Workspace, Editor, And Validation
 - [ ] Step 9: Final Skill Writes And Draft Cleanup
@@ -68,5 +68,12 @@ validation results, commit reference when available, current status, and the nex
 
 - Status: complete.
 - Validation: candidate list, detail display, approve, reject, rename, merge, and near-miss review flow are implemented in the interactive controller.
-- Commit: pending.
+- Commit: `e8325e9 feat: add candidate review flow`.
 - Next step: Step 6, scope recommendation and target path resolution.
+
+### Step 6
+
+- Status: complete.
+- Validation: skill-name sanitization, project/global Claude and Codex/agents path resolution, scope recommendation, path traversal prevention, and existing-skill detection added.
+- Commit: pending.
+- Next step: Step 7, embedded generation template and agent invocation.
