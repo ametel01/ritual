@@ -6,7 +6,7 @@ Plan source:
 - `docs/PRD.md`
 - `docs/TECH_SPEC.md`
 
-Current status: Step 10 complete; implementation commits in progress.
+Current status: Step 11 complete; implementation commits in progress.
 
 Update rule: after each completed plan step, update this file with the completed step,
 validation results, commit reference when available, current status, and the next step.
@@ -24,7 +24,7 @@ validation results, commit reference when available, current status, and the nex
 - [x] Step 8: Draft Workspace, Editor, And Validation
 - [x] Step 9: Final Skill Writes And Draft Cleanup
 - [x] Step 10: End-To-End Interactive Session Coverage
-- [ ] Step 11: Release And npm Publishing Automation
+- [x] Step 11: Release And npm Publishing Automation
 - [ ] Step 12: Production Readiness Documentation And Final MVP Audit
 
 ## Update Log
@@ -103,5 +103,12 @@ validation results, commit reference when available, current status, and the nex
 
 - Status: complete.
 - Validation: fixture-driven unit and integration tests cover parsers, prompt ranking, path safety, validation, and a full interactive session without real history or real skill roots.
-- Commit: pending.
+- Commit: `8500787 test: cover ritual end-to-end session flow`.
 - Next step: Step 11, release and npm publishing automation.
+
+### Step 11
+
+- Status: complete.
+- Validation: release workflow triggers on `v*` tags, runs `npm ci`, `npm run verify`, package dry-run, npm publish with provenance, and GitHub Release creation.
+- Commit: pending.
+- Next step: Step 12, production readiness documentation and final MVP audit.
