@@ -1,0 +1,5 @@
+{"role":"user","content":"Please review this TypeScript PR for correctness bugs and missing Vitest coverage in the repository."}
+{"role":"assistant","content":"I will inspect the diff."}
+{"type":"user","message":{"role":"user","content":[{"type":"input_text","text":"Review this TypeScript PR for correctness issues, missing tests, and package.json workflow risks."}]}}
+{"role":"user","content":[{"type":"text","text":"Can you review this TypeScript pull request for bugs, CI risks, and missing test coverage?"}]}
+not-json
