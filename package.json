@@ -19,7 +19,8 @@
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
     "verify": "bun run check && bun run typecheck && bun run test && bun run build",
-    "pack:dry-run": "bun pm pack --dry-run"
+    "pack:dry-run": "bun pm pack --dry-run",
+    "dev": "node dist/cli/main.js"
   },
   "keywords": [
     "agent",
