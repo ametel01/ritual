@@ -148,4 +148,52 @@ describe("interactive session", () => {
     expect(outputs.some((line) => line.includes("Matching prompts found locally"))).toBe(true);
     expect(outputs.some((line) => line.toLowerCase().includes("draft"))).toBe(false);
   });
+
+  it("skips repeated workflows already covered by existing skills", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "ritual-session-cwd-"));
+    const homeDir = await mkdtemp(path.join(os.tmpdir(), "ritual-session-home-"));
+    const fixturePath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "fixtures",
+      "history",
+      "codex-repeat.jsonl",
+    );
+    await nodeFileSystem.writeTextAtomic(
+      path.join(cwd, ".claude", "skills", "review-this-typescript-missing", "SKILL.md"),
+      [
+        "---",
+        "name: review-this-typescript-missing",
+        "description: Use when reviewing TypeScript pull requests for correctness and test coverage.",
+        "---",
+        "",
+        "Inspect changed files, check tests, and report concrete pull request findings.",
+      ].join("\n"),
+    );
+
+    const runner = new MockRunner();
+    const launcher = new MockLauncher(path.join(cwd, "unused", "SKILL.md"));
+    const outputs: string[] = [];
+    const prompts = new QueuePrompts({
+      confirms: [true],
+      inputs: [fixturePath],
+      selects: ["codex"],
+      checkboxes: [],
+    });
+
+    const result = await runInteractiveSession({
+      cwd,
+      homeDir,
+      env: {},
+      prompts,
+      output: { write: (message) => outputs.push(message) },
+      fs: nodeFileSystem,
+      runner,
+      launcher,
+    });
+
+    expect(result).toEqual({ status: "cancelled", reason: "No candidate was approved." });
+    expect(launcher.invocations).toEqual([]);
+    expect(outputs).toContain("Skipped 1 repeated workflow already covered by existing skills.");
+  });
 });

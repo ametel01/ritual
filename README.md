@@ -57,6 +57,9 @@ The interactive flow can add one extra Claude or Codex history file or directory
 Malformed records produce diagnostics and do not stop other files from being
 scanned.
 
+Ritual skips repeated workflow candidates that are already covered by an existing
+project-local or global Claude/Codex skill.
+
 ## Output Paths
 
 Project-local targets:

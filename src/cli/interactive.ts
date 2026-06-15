@@ -13,6 +13,7 @@ import {
   detectDraftExecutables,
   launchSkillDraftAgent,
 } from "../skills/draft.js";
+import { filterCoveredCandidates } from "../skills/duplicates.js";
 import {
   recommendScope,
   resolveSkillTargets,
@@ -107,7 +108,14 @@ export async function runInteractiveSession(
   const allCandidates = await withSpinner(spinner, "Ranking repeated workflows...", () =>
     rankWorkflowCandidatesAsync(scan.prompts),
   );
-  const candidate = await reviewCandidates(prompts, output, allCandidates);
+  const uncoveredCandidates = await removeCoveredCandidates({
+    candidates: allCandidates,
+    cwd,
+    homeDir,
+    fs,
+    output,
+  });
+  const candidate = await reviewCandidates(prompts, output, uncoveredCandidates);
   if (candidate === undefined) {
     return { status: "cancelled", reason: "No candidate was approved." };
   }
@@ -191,6 +199,36 @@ export async function runInteractiveSession(
   }
 
   return { status: "completed", writtenPaths, skillPath: primaryTarget.skillPath };
+}
+
+async function removeCoveredCandidates(options: {
+  candidates: WorkflowCandidate[];
+  cwd: string;
+  homeDir: string;
+  fs: FileSystem;
+  output: Output;
+}): Promise<WorkflowCandidate[]> {
+  const projectMatches = await filterCoveredCandidates(options.candidates, {
+    cwd: options.cwd,
+    homeDir: options.homeDir,
+    scope: "project",
+    ecosystems: ["claude", "codex"],
+    fs: options.fs,
+  });
+  const globalMatches = await filterCoveredCandidates(projectMatches.available, {
+    cwd: options.cwd,
+    homeDir: options.homeDir,
+    scope: "global",
+    ecosystems: ["claude", "codex"],
+    fs: options.fs,
+  });
+  const coveredCount = projectMatches.covered.length + globalMatches.covered.length;
+  if (coveredCount > 0) {
+    options.output.write(
+      `Skipped ${coveredCount} repeated workflow${coveredCount === 1 ? "" : "s"} already covered by existing skills.`,
+    );
+  }
+  return globalMatches.available;
 }
 
 async function askForExtraSources(prompts: PromptAdapter): Promise<HistorySource[]> {

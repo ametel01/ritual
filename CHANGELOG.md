@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Existing-skill duplicate detection that skips recurring prompt candidates already covered by project-local or global Claude/Codex skills.
 - Initial product requirements for Ritual as an interactive CLI that turns repeated Claude and Codex prompts into reusable skills.
 - Technical specification for the TypeScript, Biome, typecheck, Bun package-manager workflow, npm registry distribution, and tag-driven GitHub Actions release architecture.
 - Production TypeScript CLI scaffold with strict ESM build output and Bun-managed `ritual` executable.

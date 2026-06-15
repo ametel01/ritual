@@ -79,15 +79,16 @@ The entrypoint must run the complete guided flow:
 4. Normalize prompts.
 5. Cluster prompts locally.
 6. Rank repeated workflow candidates.
-7. Present candidates interactively.
-8. Let the user inspect, merge, rename, approve, or reject candidates.
-9. Recommend project-local or global scope.
-10. Ask the user to choose scope.
-11. Ask the user to choose Claude, Codex/agents, or both.
-12. Launch the selected local agent with the embedded generation template.
-13. The agent writes one `SKILL.md` directly to the first selected target.
-14. Validate the written skill.
-15. Mirror the same `SKILL.md` to any additional selected targets.
+7. Remove candidates already covered by existing project-local or global skills.
+8. Present candidates interactively.
+9. Let the user inspect, merge, rename, approve, or reject candidates.
+10. Recommend project-local or global scope.
+11. Ask the user to choose scope.
+12. Ask the user to choose Claude, Codex/agents, or both.
+13. Launch the selected local agent with the embedded generation template.
+14. The agent writes one `SKILL.md` directly to the first selected target.
+15. Validate the written skill.
+16. Mirror the same `SKILL.md` to any additional selected targets.
 
 All runtime decisions must be interactive prompts.
 
@@ -189,6 +190,7 @@ Required integration coverage:
 - Partial source failure with successful continuation.
 - No strong candidates path.
 - Near-miss threshold lowering.
+- Existing skill suppresses a matching repeated workflow candidate.
 - Direct write to project-local Claude target.
 - Direct write to project-local Codex/agents target.
 - Mirroring the direct write to both targets.

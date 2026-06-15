@@ -1,12 +1,18 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { ExtractedPrompt } from "../../src/history/types.js";
 import { buildDraftInvocation, detectDraftExecutables } from "../../src/skills/draft.js";
+import { filterCoveredCandidates } from "../../src/skills/duplicates.js";
 import { buildGenerationHandoffPrompt } from "../../src/skills/generation-template.js";
 import { resolveSkillTargets, sanitizeSkillName } from "../../src/skills/paths.js";
 import { validateSkillDraft } from "../../src/skills/validate.js";
 import type { CommandInvocation, CommandResult, CommandRunner } from "../../src/system/exec.js";
 import { nodeFileSystem } from "../../src/system/filesystem.js";
+
+function prompt(id: string, text: string): ExtractedPrompt {
+  return { id, source: "codex", sourcePath: "/tmp/history.jsonl", text };
+}
 
 describe("skill paths", () => {
   it("sanitizes names and prevents path traversal", () => {
@@ -27,6 +33,51 @@ describe("skill paths", () => {
       path.join(".claude", "skills", "review-pr", "SKILL.md"),
       path.join(".agents", "skills", "review-pr", "SKILL.md"),
     ]);
+  });
+});
+
+describe("skill duplicate detection", () => {
+  it("filters candidates already covered by existing skills", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "ritual-dupes-"));
+    const homeDir = await mkdtemp(path.join(os.tmpdir(), "ritual-dupes-home-"));
+    await mkdir(path.join(cwd, ".claude", "skills", "commit-all-changes-logically"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(cwd, ".claude", "skills", "commit-all-changes-logically", "SKILL.md"),
+      [
+        "---",
+        "name: commit-all-changes-logically",
+        "description: Use when asked to commit all current changes in one logical Git commit.",
+        "---",
+        "",
+        "Inspect git status, review unstaged changes, stage intentionally, validate, and commit.",
+      ].join("\n"),
+    );
+
+    const candidate = {
+      id: "candidate-1",
+      name: "commit-all-changes-logically",
+      summary: "commit all unstaged changes in a single commit",
+      prompts: [],
+      representativePrompts: [prompt("prompt-1", "commit all unstaged changes in a single commit")],
+      count: 3,
+      coherence: 1,
+      rankScore: 10,
+      rankReason: "Repeated commit workflow.",
+      isStrong: true,
+    };
+
+    const result = await filterCoveredCandidates([candidate], {
+      cwd,
+      homeDir,
+      scope: "project",
+      ecosystems: ["claude", "codex"],
+      fs: nodeFileSystem,
+    });
+
+    expect(result.available).toEqual([]);
+    expect(result.covered[0]?.skill.name).toBe("commit-all-changes-logically");
   });
 });
 

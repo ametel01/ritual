@@ -102,7 +102,7 @@ export async function resolveSkillTargets(
   return targets;
 }
 
-function skillRoot(options: {
+export function skillRoot(options: {
   cwd: string;
   homeDir: string;
   ecosystem: SkillEcosystem;
