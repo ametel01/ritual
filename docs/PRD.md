@@ -43,7 +43,7 @@ Existing history tools help users inspect what happened. Existing skill generato
 - Let the user approve, merge, rename, or reject candidates.
 - Generate one skill per run.
 - Use an embedded, versioned skill-generation prompt derived from `skill-creator`.
-- Call a local coding-agent executable, such as `claude` or `codex exec`, only after user approval.
+- Call a local coding-agent executable, such as `claude` or `codex`, only after user approval.
 - Let the user edit the draft before final validation and write.
 - Validate generated skill drafts with built-in `SKILL.md` checks and, when available, `agnix`.
 - Write the same approved `SKILL.md` to Claude, Codex/agents, or both selected targets.
@@ -179,7 +179,8 @@ When run inside a repository, the recommended default is project-local scope and
 - Include the approved candidate name, representative prompts, rank rationale, selected scope, and selected ecosystem targets in the drafting prompt.
 - Call a local agent executable to draft the skill only after user approval.
 - Support `claude` when available.
-- Support `codex exec` when available.
+- Support `codex` when available.
+- Launch the selected agent as an inherited terminal session with the generated drafting prompt as the final argument.
 - Make the agent invocation explicit before running it because local agent tools may call external services depending on user configuration.
 - Do not improvise the skill-generation prompt per candidate.
 
@@ -268,7 +269,7 @@ Warnings:
 - Given clustered candidates, Ritual ranks and presents the top candidates interactively.
 - Given no strong candidate, Ritual shows near-misses and does not generate by default.
 - Given two similar candidates, the user can merge them before drafting.
-- Given an approved candidate, Ritual can invoke `claude` or `codex exec` locally to create a high-quality draft skill using the embedded skill-generation prompt.
+- Given an approved candidate, Ritual can invoke `claude` or `codex` locally to create a high-quality draft skill using the embedded skill-generation prompt.
 - Given a draft skill, the user can edit it before final validation.
 - Given a draft skill, Ritual blocks writes on structural validation failures.
 - Given warning-only validation results, Ritual lets the user decide whether to continue.

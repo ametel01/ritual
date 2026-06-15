@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -18,6 +18,10 @@ export type CommandRunner = {
   run(invocation: CommandInvocation): Promise<CommandResult>;
 };
 
+export type CommandLauncher = {
+  launch(invocation: CommandInvocation, options: { cwd: string }): Promise<number>;
+};
+
 export const nodeCommandRunner: CommandRunner = {
   async which(command: string): Promise<string | undefined> {
     try {
@@ -33,5 +37,18 @@ export const nodeCommandRunner: CommandRunner = {
       maxBuffer: 1024 * 1024 * 10,
     });
     return { stdout: result.stdout, stderr: result.stderr };
+  },
+};
+
+export const nodeCommandLauncher: CommandLauncher = {
+  launch(invocation: CommandInvocation, options: { cwd: string }): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(invocation.command, invocation.args, {
+        cwd: options.cwd,
+        stdio: "inherit",
+      });
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code ?? 0));
+    });
   },
 };

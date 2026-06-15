@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { detectDraftExecutables } from "../../src/skills/draft.js";
+import { buildDraftInvocation, detectDraftExecutables } from "../../src/skills/draft.js";
+import { buildGenerationHandoffPrompt } from "../../src/skills/generation-template.js";
 import { resolveSkillTargets, sanitizeSkillName } from "../../src/skills/paths.js";
 import { validateSkillDraft } from "../../src/skills/validate.js";
 import type { CommandInvocation, CommandResult, CommandRunner } from "../../src/system/exec.js";
@@ -43,6 +44,52 @@ describe("skill draft executables", () => {
     };
 
     await expect(detectDraftExecutables(runner)).resolves.toEqual(["claude", "codex"]);
+  });
+
+  it("builds inherited agent launch argv with the prompt as the final argument", () => {
+    expect(buildDraftInvocation("claude", "draft this")).toEqual({
+      command: "claude",
+      args: ["--dangerously-skip-permissions", "draft this"],
+    });
+    expect(buildDraftInvocation("codex", "draft this")).toEqual({
+      command: "codex",
+      args: ["--yolo", "draft this"],
+    });
+  });
+
+  it("builds a handoff prompt that tells the launched agent where to write the draft", () => {
+    const prompt = buildGenerationHandoffPrompt(
+      {
+        skillName: "review-pr",
+        scope: "project",
+        ecosystems: ["claude", "codex"],
+        candidate: {
+          id: "candidate-1",
+          name: "review-pr",
+          summary: "review pull requests",
+          prompts: [],
+          representativePrompts: [
+            {
+              id: "prompt-1",
+              source: "codex",
+              sourcePath: "/history.jsonl",
+              text: "review this pull request",
+            },
+          ],
+          count: 3,
+          coherence: 1,
+          rankScore: 10,
+          rankReason: "Repeated review workflow.",
+          isStrong: true,
+        },
+      },
+      "/repo/.ritual/drafts/review-pr/SKILL.md",
+    );
+
+    expect(prompt).toContain("Create exactly one reusable agent skill and write it to this file:");
+    expect(prompt).toContain("/repo/.ritual/drafts/review-pr/SKILL.md");
+    expect(prompt).toContain("Do not print the skill instead of writing the file.");
+    expect(prompt).not.toContain("Return only the contents of SKILL.md.");
   });
 });
 

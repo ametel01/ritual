@@ -4,7 +4,12 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInteractiveSession } from "../../src/cli/interactive.js";
 import type { PromptAdapter } from "../../src/cli/prompts.js";
-import type { CommandInvocation, CommandResult, CommandRunner } from "../../src/system/exec.js";
+import type {
+  CommandInvocation,
+  CommandLauncher,
+  CommandResult,
+  CommandRunner,
+} from "../../src/system/exec.js";
 import { nodeFileSystem } from "../../src/system/filesystem.js";
 
 class QueuePrompts implements PromptAdapter {
@@ -59,16 +64,25 @@ class QueuePrompts implements PromptAdapter {
 }
 
 class MockRunner implements CommandRunner {
-  invocations: CommandInvocation[] = [];
-
   async which(command: string): Promise<string | undefined> {
     return command === "claude" ? "/usr/local/bin/claude" : undefined;
   }
 
-  async run(invocation: CommandInvocation): Promise<CommandResult> {
-    this.invocations.push(invocation);
-    return {
-      stdout: [
+  async run(_invocation: CommandInvocation): Promise<CommandResult> {
+    throw new Error("not used");
+  }
+}
+
+class MockLauncher implements CommandLauncher {
+  invocations: Array<{ invocation: CommandInvocation; cwd: string }> = [];
+
+  constructor(private readonly skillPath: string) {}
+
+  async launch(invocation: CommandInvocation, options: { cwd: string }): Promise<number> {
+    this.invocations.push({ invocation, cwd: options.cwd });
+    await nodeFileSystem.writeTextAtomic(
+      this.skillPath,
+      [
         "---",
         "name: pr-review-workflow",
         "description: Use when reviewing TypeScript pull requests for correctness, CI risk, and test coverage.",
@@ -80,8 +94,8 @@ class MockRunner implements CommandRunner {
         "- Check package scripts, tests, and CI expectations.",
         "- Report findings with file references and concrete fixes.",
       ].join("\n"),
-      stderr: "",
-    };
+    );
+    return 0;
   }
 }
 
@@ -97,6 +111,8 @@ describe("interactive session", () => {
       "codex-repeat.jsonl",
     );
     const runner = new MockRunner();
+    const draftPath = path.join(cwd, ".ritual", "drafts", "pr-review-workflow", "SKILL.md");
+    const launcher = new MockLauncher(draftPath);
     const outputs: string[] = [];
     const prompts = new QueuePrompts({
       confirms: [true, true, true, true],
@@ -113,11 +129,17 @@ describe("interactive session", () => {
       output: { write: (message) => outputs.push(message) },
       fs: nodeFileSystem,
       runner,
+      launcher,
     });
 
     expect(result.status).toBe("completed");
-    expect(runner.invocations).toHaveLength(1);
-    expect(runner.invocations[0]?.command).toBe("claude");
+    expect(launcher.invocations).toHaveLength(1);
+    expect(launcher.invocations[0]?.invocation.command).toBe("claude");
+    expect(launcher.invocations[0]?.invocation.args[0]).toBe("--dangerously-skip-permissions");
+    expect(launcher.invocations[0]?.invocation.args.at(-1)).toContain(
+      "Create exactly one reusable agent skill and write it to this file:",
+    );
+    expect(launcher.invocations[0]?.cwd).toBe(cwd);
 
     const claudePath = path.join(cwd, ".claude", "skills", "pr-review-workflow", "SKILL.md");
     const codexPath = path.join(cwd, ".agents", "skills", "pr-review-workflow", "SKILL.md");

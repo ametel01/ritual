@@ -14,13 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Local Claude and Codex JSON/JSONL history discovery, resilient user-prompt extraction, and source diagnostics.
 - Local prompt normalization, lexical clustering, recurrence ranking, candidate selection, and two-match fallback handling.
 - Project/global scope selection, Claude and Codex/agents target resolution, safe skill-name sanitization, and overwrite protection.
-- Explicitly approved `claude` or `codex exec` drafting with an embedded versioned skill-generation prompt.
+- Explicitly approved `claude` or `codex` drafting with an embedded versioned skill-generation prompt.
 - Draft workspace creation, optional `$EDITOR` review, built-in `SKILL.md` validation with optional `agnix`, final writes, and draft cleanup choice.
 - Unit and integration tests covering parsers, ranking, path safety, validation, and the full fixture-driven session flow.
 - GitHub Actions CI and tag-driven Bun release workflow.
 
 ### Changed
 
+- Launch Claude or Codex as an inherited terminal session for skill drafting, passing the generated skill prompt as the final argv argument and validating the draft file the agent writes.
 - Refactored the Ritual CLI entrypoint into a reusable runtime lifecycle wrapper with signal handling, stdin cleanup, help normalization, and top-level error funneling while preserving the one-command/no-flags MVP contract.
 - Switched the project package manager from npm to Bun, replacing `package-lock.json` with `bun.lock` and updating local, CI, and release commands to use `bun`.
 - Made the interactive candidate-review flow friendlier by replacing raw internal slugs, lexical-coherence details, and near-miss terminology with plain workflow summaries and actions.

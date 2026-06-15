@@ -251,7 +251,9 @@ Skill drafting uses a local agent executable only after the user approves a cand
 Supported drafting executables:
 
 - `claude`
-- `codex exec`
+- `codex`
+
+Ritual launches the selected executable as an inherited terminal session and passes the generated drafting prompt as the final argv argument. Claude launches with `--dangerously-skip-permissions`; Codex launches with `--yolo`. The prompt tells the agent to write `.ritual/drafts/<skill-name>/SKILL.md`, and Ritual validates that file after the agent exits.
 
 The drafting prompt must come from an embedded, versioned template derived from `skill-creator`. Runtime behavior must not depend on the user's installed `skill-creator` files.
 

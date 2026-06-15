@@ -7,10 +7,10 @@ import type { WorkflowCandidate } from "../prompts/types.js";
 import {
   buildDraftInvocation,
   candidateLooksTooVague,
-  createSkillDraft,
   type DraftExecutable,
   detectDraftExecutables,
-  writeDraftWorkspace,
+  launchSkillDraftAgent,
+  prepareDraftWorkspace,
 } from "../skills/draft.js";
 import {
   recommendScope,
@@ -23,7 +23,12 @@ import {
 import { validateSkillDraft } from "../skills/validate.js";
 import { writeFinalSkill } from "../skills/write.js";
 import { openEditor, type RuntimeEnv } from "../system/editor.js";
-import { type CommandRunner, nodeCommandRunner } from "../system/exec.js";
+import {
+  type CommandLauncher,
+  type CommandRunner,
+  nodeCommandLauncher,
+  nodeCommandRunner,
+} from "../system/exec.js";
 import { type FileSystem, nodeFileSystem } from "../system/filesystem.js";
 import { formatDiagnostics, formatSourceSummary } from "../telemetry/diagnostics.js";
 import { inquirerPromptAdapter, type PromptAdapter } from "./prompts.js";
@@ -40,6 +45,7 @@ export type InteractiveOptions = {
   output?: Output;
   fs?: FileSystem;
   runner?: CommandRunner;
+  launcher?: CommandLauncher;
 };
 
 export type SessionResult =
@@ -56,6 +62,7 @@ export async function runInteractiveSession(
   const output = options.output ?? { write: (message: string) => console.log(message) };
   const fs = options.fs ?? nodeFileSystem;
   const runner = options.runner ?? nodeCommandRunner;
+  const launcher = options.launcher ?? nodeCommandLauncher;
 
   output.write("Ritual scans local Claude and Codex history to find repeated workflow prompts.");
 
@@ -131,22 +138,32 @@ export async function runInteractiveSession(
     };
   }
 
-  const invocationPreview = previewInvocation(executable, candidate, skillName, scope, ecosystems);
-  output.write(`Draft invocation: ${invocationPreview}`);
+  const draft = await prepareDraftWorkspace({ cwd, skillName, fs });
+  const invocationPreview = previewInvocation(executable);
+  output.write(`Draft path: ${draft.skillPath}`);
+  output.write(`Agent command: ${invocationPreview} <generated skill prompt>`);
   const approveInvocation = await prompts.confirm(
-    "Run this local agent executable to draft SKILL.md?",
+    `Open ${draftExecutableLabel(executable)} in this terminal to draft SKILL.md?`,
     false,
   );
   if (!approveInvocation) {
     return { status: "cancelled", reason: "Draft invocation was not approved." };
   }
 
-  const draftContent = await createSkillDraft({
+  const exitCode = await launchSkillDraftAgent({
     request: { candidate, skillName, scope, ecosystems },
-    runner,
     executable,
+    cwd,
+    draftPath: draft.skillPath,
+    launcher,
   });
-  const draft = await writeDraftWorkspace({ cwd, skillName, content: draftContent, fs });
+  if (exitCode !== 0) {
+    return { status: "cancelled", reason: `Draft agent exited with code ${exitCode}.` };
+  }
+  const draftContent = await fs.readText(draft.skillPath);
+  if (draftContent.trim().length === 0) {
+    return { status: "cancelled", reason: "Draft agent did not write SKILL.md." };
+  }
   output.write(`Draft written to ${draft.skillPath}`);
 
   await offerEditor({ prompts, output, env, runner, draftPath: draft.skillPath });
@@ -288,7 +305,7 @@ function draftExecutableLabel(executable: DraftExecutable): string {
 }
 
 function draftExecutableCommand(executable: DraftExecutable): string {
-  return executable === "claude" ? "claude -p" : "codex exec";
+  return executable === "claude" ? "claude" : "codex";
 }
 
 async function confirmRiskyTargets(
@@ -334,16 +351,8 @@ async function offerEditor(options: {
   }
 }
 
-function previewInvocation(
-  executable: DraftExecutable,
-  candidate: WorkflowCandidate,
-  skillName: string,
-  scope: SkillScope,
-  ecosystems: SkillEcosystem[],
-): string {
-  const invocation = buildDraftInvocation(
-    executable,
-    `${candidate.name}:${skillName}:${scope}:${ecosystems.join(",")}`,
-  );
-  return `${invocation.command} ${invocation.args.map((arg) => (arg.length > 60 ? `${arg.slice(0, 57)}...` : arg)).join(" ")}`;
+function previewInvocation(executable: DraftExecutable): string {
+  const invocation = buildDraftInvocation(executable, "");
+  const argsWithoutPrompt = invocation.args.slice(0, -1);
+  return [invocation.command, ...argsWithoutPrompt].join(" ");
 }

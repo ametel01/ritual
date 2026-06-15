@@ -37,3 +37,31 @@ Requirements:
 - Avoid leaking private history details beyond generalized workflow instructions.
 `;
 }
+
+export function buildGenerationHandoffPrompt(
+  options: {
+    candidate: WorkflowCandidate;
+    skillName: string;
+    scope: SkillScope;
+    ecosystems: SkillEcosystem[];
+  },
+  draftPath: string,
+): string {
+  const prompt = buildGenerationPrompt(options)
+    .replace(
+      "Create exactly one reusable agent skill as a single SKILL.md file.",
+      `Create exactly one reusable agent skill and write it to this file:\n${draftPath}`,
+    )
+    .replace(
+      "- Return only the contents of SKILL.md.",
+      `- Write only the contents of SKILL.md to ${draftPath}.`,
+    );
+
+  return `${prompt}
+Additional handoff instructions:
+- Write the complete SKILL.md contents directly to ${draftPath}.
+- Create the parent directory if it does not exist.
+- Do not print the skill instead of writing the file.
+- After writing the file, briefly summarize what you wrote and return control to the terminal.
+`;
+}
