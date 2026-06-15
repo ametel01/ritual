@@ -28,7 +28,7 @@ export type HandoffInput = {
   readonly projectName: string;
   readonly rootDirectory: string;
   readonly interactive: boolean;
-  readonly outputDirectory?: string | null | undefined;
+  readonly outputDirectory?: string | null;
   readonly prompts: PromptAdapter;
   readonly runner: CommandRunner;
   readonly output?: HandoffOutput;
@@ -41,7 +41,7 @@ export type HandoffGateInput = {
   readonly isQuiet: boolean;
   readonly skipPrompts: boolean;
   readonly stdoutIsTty: boolean;
-  readonly env?: Environment | undefined;
+  readonly env?: Environment;
   readonly selectedDiagnostics: ReadonlyArray<Diagnostic>;
 };
 

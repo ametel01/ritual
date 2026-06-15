@@ -10,7 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - React Doctor-style diagnostic contracts, stable rule grouping, diagnostics dump writing, and top-three handoff prompt construction for the internal CLI refactor.
 - Coding-agent environment detection, handoff gating, clipboard fallback, and Claude Code, Codex, and Cursor launch command construction for the internal CLI flow.
-- Internal inspect command runtime with JSON and score output modes, CI exit-code handling, coding-agent install hints, and a testable CLI lifecycle wrapper that preserves Ritual's no-flags MVP command.
 - Initial product requirements for Ritual as an interactive CLI that turns repeated Claude and Codex prompts into reusable skills.
 - Technical specification for the TypeScript, Biome, typecheck, Bun package-manager workflow, npm registry distribution, and tag-driven GitHub Actions release architecture.
 - Production TypeScript CLI scaffold with strict ESM build output and Bun-managed `ritual` executable.
