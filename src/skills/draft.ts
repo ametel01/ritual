@@ -1,7 +1,5 @@
-import * as path from "node:path";
 import type { WorkflowCandidate } from "../prompts/types.js";
 import type { CommandInvocation, CommandLauncher, CommandRunner } from "../system/exec.js";
-import type { FileSystem } from "../system/filesystem.js";
 import { buildGenerationHandoffPrompt } from "./generation-template.js";
 import type { SkillEcosystem, SkillScope } from "./paths.js";
 
@@ -36,30 +34,15 @@ export function buildDraftInvocation(
   return { command: "codex", args: ["--yolo", prompt] };
 }
 
-export async function prepareDraftWorkspace(options: {
-  cwd: string;
-  skillName: string;
-  fs: FileSystem;
-}): Promise<{ draftDir: string; skillPath: string }> {
-  const draftDir = path.join(options.cwd, ".ritual", "drafts", options.skillName);
-  await options.fs.ensureDir(draftDir);
-  return { draftDir, skillPath: path.join(draftDir, "SKILL.md") };
-}
-
 export async function launchSkillDraftAgent(options: {
   request: DraftRequest;
   executable: DraftExecutable;
   cwd: string;
-  draftPath: string;
+  skillPath: string;
   launcher: CommandLauncher;
 }): Promise<number> {
-  const prompt = buildGenerationHandoffPrompt(options.request, options.draftPath);
+  const prompt = buildGenerationHandoffPrompt(options.request, options.skillPath);
   return options.launcher.launch(buildDraftInvocation(options.executable, prompt), {
     cwd: options.cwd,
   });
-}
-
-export function candidateLooksTooVague(candidate: WorkflowCandidate): boolean {
-  const text = candidate.representativePrompts.map((prompt) => prompt.text).join(" ");
-  return text.trim().split(/\s+/).length < 12 || candidate.coherence < 0.2;
 }

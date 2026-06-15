@@ -37,7 +37,7 @@ export async function validateSkillDraft(options: {
   try {
     content = await options.fs.readText(skillPath);
   } catch {
-    errors.push({ code: "missing-skill", message: "Draft workspace is missing SKILL.md." });
+    errors.push({ code: "missing-skill", message: "Skill target is missing SKILL.md." });
     return { errors, warnings, agnixAvailable: false };
   }
 

@@ -1,16 +1,13 @@
 import * as os from "node:os";
-import * as path from "node:path";
 import { discoverHistorySources, scanHistorySources } from "../history/discover.js";
 import type { HistorySource } from "../history/types.js";
 import { nearMissCandidates, rankWorkflowCandidates, strongCandidates } from "../prompts/rank.js";
 import type { WorkflowCandidate } from "../prompts/types.js";
 import {
   buildDraftInvocation,
-  candidateLooksTooVague,
   type DraftExecutable,
   detectDraftExecutables,
   launchSkillDraftAgent,
-  prepareDraftWorkspace,
 } from "../skills/draft.js";
 import {
   recommendScope,
@@ -22,7 +19,7 @@ import {
 } from "../skills/paths.js";
 import { validateSkillDraft } from "../skills/validate.js";
 import { writeFinalSkill } from "../skills/write.js";
-import { openEditor, type RuntimeEnv } from "../system/editor.js";
+import type { RuntimeEnv } from "../system/editor.js";
 import {
   type CommandLauncher,
   type CommandRunner,
@@ -32,6 +29,7 @@ import {
 import { type FileSystem, nodeFileSystem } from "../system/filesystem.js";
 import { formatDiagnostics, formatSourceSummary } from "../telemetry/diagnostics.js";
 import { inquirerPromptAdapter, type PromptAdapter } from "./prompts.js";
+import { createSpinnerFactory, type SpinnerFactory } from "./spinner.js";
 
 export type Output = {
   write(message: string): void;
@@ -46,10 +44,11 @@ export type InteractiveOptions = {
   fs?: FileSystem;
   runner?: CommandRunner;
   launcher?: CommandLauncher;
+  spinner?: SpinnerFactory;
 };
 
 export type SessionResult =
-  | { status: "completed"; writtenPaths: string[]; draftPath: string }
+  | { status: "completed"; writtenPaths: string[]; skillPath: string }
   | { status: "cancelled"; reason: string };
 
 export async function runInteractiveSession(
@@ -63,20 +62,34 @@ export async function runInteractiveSession(
   const fs = options.fs ?? nodeFileSystem;
   const runner = options.runner ?? nodeCommandRunner;
   const launcher = options.launcher ?? nodeCommandLauncher;
+  const spinner = options.spinner ?? createSpinnerFactory({ env });
 
   output.write("Ritual scans local Claude and Codex history to find repeated workflow prompts.");
 
-  const extraSources = await askForExtraSources(prompts);
-  const discovered = await discoverHistorySources({ cwd, homeDir, extraSources });
-  for (const line of formatDiagnostics(discovered.diagnostics)) {
+  const discovered = await withSpinner(spinner, "Finding local history sources...", () =>
+    discoverHistorySources({ cwd, homeDir }),
+  );
+  let sources = discovered.sources;
+  if (sources.length === 0) {
+    const extraSources = await askForExtraSources(prompts);
+    if (extraSources.length > 0) {
+      const withExtra = await withSpinner(spinner, "Finding extra history sources...", () =>
+        discoverHistorySources({ cwd, homeDir, extraSources }),
+      );
+      sources = withExtra.sources;
+      discovered.diagnostics.push(...withExtra.diagnostics);
+    }
+  }
+
+  for (const line of formatDiagnostics(discovered.diagnostics.filter(isErrorDiagnostic))) {
     output.write(line);
   }
 
-  const scan = await scanHistorySources(discovered.sources);
+  const scan = await withSpinner(spinner, "Parsing history...", () => scanHistorySources(sources));
   for (const line of formatSourceSummary(scan.sources)) {
     output.write(line);
   }
-  for (const line of formatDiagnostics(scan.diagnostics)) {
+  for (const line of formatDiagnostics(scan.diagnostics.filter(isErrorDiagnostic))) {
     output.write(line);
   }
 
@@ -87,7 +100,9 @@ export async function runInteractiveSession(
     };
   }
 
-  const allCandidates = rankWorkflowCandidates(scan.prompts);
+  const allCandidates = await withSpinner(spinner, "Ranking repeated workflows...", () =>
+    Promise.resolve(rankWorkflowCandidates(scan.prompts)),
+  );
   const candidate = await reviewCandidates(prompts, output, allCandidates);
   if (candidate === undefined) {
     return { status: "cancelled", reason: "No candidate was approved." };
@@ -116,18 +131,8 @@ export async function runInteractiveSession(
   }
 
   const targets = await resolveSkillTargets({ cwd, homeDir, name: skillName, scope, ecosystems });
-  if (!(await confirmRiskyTargets(prompts, targets))) {
+  if (!(await confirmExistingTargets(prompts, targets))) {
     return { status: "cancelled", reason: "Target write was not approved." };
-  }
-
-  if (candidateLooksTooVague(candidate)) {
-    const continueDraft = await prompts.confirm(
-      "This candidate appears vague. Continue drafting anyway?",
-      false,
-    );
-    if (!continueDraft) {
-      return { status: "cancelled", reason: "Candidate was too vague to draft." };
-    }
   }
 
   const executable = await chooseDraftExecutable(prompts, runner);
@@ -138,69 +143,50 @@ export async function runInteractiveSession(
     };
   }
 
-  const draft = await prepareDraftWorkspace({ cwd, skillName, fs });
-  const invocationPreview = previewInvocation(executable);
-  output.write(`Draft path: ${draft.skillPath}`);
-  output.write(`Agent command: ${invocationPreview} <generated skill prompt>`);
-  const approveInvocation = await prompts.confirm(
-    `Open ${draftExecutableLabel(executable)} in this terminal to draft SKILL.md?`,
-    false,
-  );
-  if (!approveInvocation) {
-    return { status: "cancelled", reason: "Draft invocation was not approved." };
+  const primaryTarget = targets[0];
+  if (primaryTarget === undefined) {
+    return { status: "cancelled", reason: "No output ecosystem was selected." };
   }
+  const invocationPreview = previewInvocation(executable);
+  output.write(`Skill path: ${primaryTarget.skillPath}`);
+  output.write(`Agent command: ${invocationPreview} <generated skill prompt>`);
 
   const exitCode = await launchSkillDraftAgent({
     request: { candidate, skillName, scope, ecosystems },
     executable,
     cwd,
-    draftPath: draft.skillPath,
+    skillPath: primaryTarget.skillPath,
     launcher,
   });
   if (exitCode !== 0) {
     return { status: "cancelled", reason: `Draft agent exited with code ${exitCode}.` };
   }
-  const draftContent = await fs.readText(draft.skillPath);
-  if (draftContent.trim().length === 0) {
+  const skillContent = await fs.readText(primaryTarget.skillPath);
+  if (skillContent.trim().length === 0) {
     return { status: "cancelled", reason: "Draft agent did not write SKILL.md." };
   }
-  output.write(`Draft written to ${draft.skillPath}`);
+  output.write(`Skill written to ${primaryTarget.skillPath}`);
 
-  await offerEditor({ prompts, output, env, runner, draftPath: draft.skillPath });
-
-  const validation = await validateSkillDraft({ draftDir: draft.draftDir, fs, runner });
+  const validation = await validateSkillDraft({ draftDir: primaryTarget.skillDir, fs, runner });
   for (const error of validation.errors) {
     output.write(`[error] ${error.message}`);
   }
-  for (const warning of validation.warnings) {
-    output.write(`[warning] ${warning.message}`);
-  }
   if (validation.errors.length > 0) {
-    return { status: "cancelled", reason: "Draft validation failed." };
-  }
-  if (
-    validation.warnings.length > 0 &&
-    !(await prompts.confirm("Validation produced warnings. Continue to final write?", false))
-  ) {
-    return { status: "cancelled", reason: "Validation warnings were not approved." };
+    return { status: "cancelled", reason: "Skill validation failed." };
   }
 
-  if (!(await prompts.confirm("Write the approved skill to the selected targets?", false))) {
-    return { status: "cancelled", reason: "Final write was not approved." };
-  }
-
-  const approvedContent = await fs.readText(draft.skillPath);
-  const writtenPaths = await writeFinalSkill({ targets, content: approvedContent, fs });
-  for (const writtenPath of writtenPaths) {
+  const additionalTargets = targets.slice(1);
+  const additionalWrittenPaths = await writeFinalSkill({
+    targets: additionalTargets,
+    content: skillContent,
+    fs,
+  });
+  const writtenPaths = [primaryTarget.skillPath, ...additionalWrittenPaths];
+  for (const writtenPath of writtenPaths.slice(1)) {
     output.write(`Wrote ${writtenPath}`);
   }
 
-  const keepDraft = await prompts.confirm("Keep the draft workspace?", true);
-  if (!keepDraft) {
-    await fs.removeDir(path.join(cwd, ".ritual", "drafts", skillName));
-  }
-
-  return { status: "completed", writtenPaths, draftPath: draft.skillPath };
+  return { status: "completed", writtenPaths, skillPath: primaryTarget.skillPath };
 }
 
 async function askForExtraSources(prompts: PromptAdapter): Promise<HistorySource[]> {
@@ -308,18 +294,10 @@ function draftExecutableCommand(executable: DraftExecutable): string {
   return executable === "claude" ? "claude" : "codex";
 }
 
-async function confirmRiskyTargets(
+async function confirmExistingTargets(
   prompts: PromptAdapter,
   targets: SkillTarget[],
 ): Promise<boolean> {
-  const globalTargets = targets.filter((target) => target.scope === "global");
-  if (
-    globalTargets.length > 0 &&
-    !(await prompts.confirm("Global skill writes affect future agent sessions. Continue?", false))
-  ) {
-    return false;
-  }
-
   const existing = targets.filter((target) => target.exists);
   if (existing.length === 0) {
     return true;
@@ -330,29 +308,28 @@ async function confirmRiskyTargets(
   );
 }
 
-async function offerEditor(options: {
-  prompts: PromptAdapter;
-  output: Output;
-  env: RuntimeEnv;
-  runner: CommandRunner;
-  draftPath: string;
-}): Promise<void> {
-  if (options.env.EDITOR === undefined) {
-    options.output.write("$EDITOR is not set; continuing with prompt-based review.");
-    return;
-  }
-  if (await options.prompts.confirm("Open draft in $EDITOR before validation?", true)) {
-    const result = await openEditor({
-      filePath: options.draftPath,
-      env: options.env,
-      runner: options.runner,
-    });
-    options.output.write(result.message);
-  }
-}
-
 function previewInvocation(executable: DraftExecutable): string {
   const invocation = buildDraftInvocation(executable, "");
   const argsWithoutPrompt = invocation.args.slice(0, -1);
   return [invocation.command, ...argsWithoutPrompt].join(" ");
+}
+
+function isErrorDiagnostic(diagnostic: { level: string }): boolean {
+  return diagnostic.level === "error";
+}
+
+async function withSpinner<T>(
+  spinner: SpinnerFactory,
+  text: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const handle = spinner.start(text);
+  try {
+    const result = await operation();
+    handle.succeed(text);
+    return result;
+  } catch (error) {
+    handle.fail(text);
+    throw error;
+  }
 }

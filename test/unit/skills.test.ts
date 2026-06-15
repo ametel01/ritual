@@ -57,7 +57,7 @@ describe("skill draft executables", () => {
     });
   });
 
-  it("builds a handoff prompt that tells the launched agent where to write the draft", () => {
+  it("builds a handoff prompt that tells the launched agent where to write the skill", () => {
     const prompt = buildGenerationHandoffPrompt(
       {
         skillName: "review-pr",
@@ -83,11 +83,13 @@ describe("skill draft executables", () => {
           isStrong: true,
         },
       },
-      "/repo/.ritual/drafts/review-pr/SKILL.md",
+      "/repo/.claude/skills/review-pr/SKILL.md",
     );
 
-    expect(prompt).toContain("Create exactly one reusable agent skill and write it to this file:");
-    expect(prompt).toContain("/repo/.ritual/drafts/review-pr/SKILL.md");
+    expect(prompt).toContain(
+      "Create exactly one reusable agent skill and write it directly to this file:",
+    );
+    expect(prompt).toContain("/repo/.claude/skills/review-pr/SKILL.md");
     expect(prompt).toContain("Do not print the skill instead of writing the file.");
     expect(prompt).not.toContain("Return only the contents of SKILL.md.");
   });

@@ -75,13 +75,10 @@ Existing history tools help users inspect what happened. Existing skill generato
 11. The user chooses project-local or global skill scope.
 12. The user chooses Claude, Codex/agents, or both output ecosystems.
 13. Ritual calls a local agent executable to draft a skill for the approved candidate.
-14. Ritual writes the temporary draft to `.ritual/drafts/<skill-name>/SKILL.md`.
-15. The user reviews and may edit the draft before final validation.
-16. Ritual validates the draft.
-17. Ritual shows blocking errors and quality warnings.
-18. The user approves the final write.
-19. Ritual writes the same `SKILL.md` to the selected target path or paths.
-20. Ritual prints the final paths.
+14. The selected agent writes the `SKILL.md` directly to the first selected target path.
+15. Ritual validates the written skill and blocks on structural errors.
+16. Ritual mirrors the same `SKILL.md` to any additional selected target paths.
+17. Ritual prints the final paths.
 
 ## Functional Requirements
 
@@ -194,18 +191,9 @@ The generated skill must be high quality. It should use the shared `SKILL.md` fo
 - No `README.md`, changelog, installation guide, or unrelated auxiliary docs.
 - Optional `scripts/`, `references/`, or `assets/` only when the repeated workflow clearly needs them.
 
-### Draft Editing
-
-- Write temporary drafts to `.ritual/drafts/<skill-name>/SKILL.md`.
-- Let the user inspect the draft before writing it to a skill root.
-- Offer to open the draft in `$EDITOR` when available.
-- Fall back to an approve, reject, or retry prompt when `$EDITOR` is unavailable.
-- Validate after the user has had a chance to edit.
-- Ask interactively whether to keep or delete the draft workspace after final write.
-
 ### Validation
 
-- Validate that the draft contains a `SKILL.md`.
+- Validate that the selected skill target contains a `SKILL.md`.
 - Validate YAML frontmatter format.
 - Validate that frontmatter contains only `name` and `description`.
 - Validate that `name` is lowercase hyphen-case.
@@ -214,7 +202,7 @@ The generated skill must be high quality. It should use the shared `SKILL.md` fo
 - Validate that the body is not placeholder text.
 - Use `agnix` validation when available.
 - Fall back to built-in checks when `agnix` is unavailable.
-- Report validation errors and warnings before writing.
+- Report blocking validation errors.
 
 Blocking errors:
 
@@ -256,7 +244,6 @@ Warnings:
 - The user can create one valid reusable skill from repeated history in one interactive session.
 - The top ranked candidates contain workflows the user recognizes as repeated.
 - The user can reject noise without editing files manually.
-- The user can review and edit the generated draft before writing.
 - A generated skill passes structural validation.
 - The output path matches the selected scope and ecosystem targets.
 - The CLI can be used successfully with only `bunx ritual@latest`.

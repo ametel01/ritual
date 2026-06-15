@@ -65,7 +65,7 @@ Boundaries:
 - `cli/` owns terminal interaction only.
 - `history/` owns source discovery and parser resilience.
 - `prompts/` owns local-only normalization, clustering, and ranking.
-- `skills/` owns skill generation prompts, draft validation, target path resolution, and final writes.
+- `skills/` owns skill generation prompts, skill validation, target path resolution, and final writes.
 - `system/` wraps side-effecting operations so they can be tested.
 - `telemetry/` owns local diagnostics output only; it must not upload data.
 
@@ -84,14 +84,10 @@ The entrypoint must run the complete guided flow:
 9. Recommend project-local or global scope.
 10. Ask the user to choose scope.
 11. Ask the user to choose Claude, Codex/agents, or both.
-12. Confirm local agent invocation for drafting.
-13. Draft one `SKILL.md` using the embedded generation template.
-14. Write the draft to `.ritual/drafts/<skill-name>/SKILL.md`.
-15. Offer `$EDITOR` editing.
-16. Validate the draft.
-17. Ask for final approval.
-18. Write the same `SKILL.md` to all selected targets.
-19. Ask whether to keep or delete the draft workspace.
+12. Launch the selected local agent with the embedded generation template.
+13. The agent writes one `SKILL.md` directly to the first selected target.
+14. Validate the written skill.
+15. Mirror the same `SKILL.md` to any additional selected targets.
 
 All runtime decisions must be interactive prompts.
 
@@ -193,10 +189,9 @@ Required integration coverage:
 - Partial source failure with successful continuation.
 - No strong candidates path.
 - Near-miss threshold lowering.
-- Draft creation under `.ritual/drafts`.
-- Final write to project-local Claude target.
-- Final write to project-local Codex/agents target.
-- Final write to both targets.
+- Direct write to project-local Claude target.
+- Direct write to project-local Codex/agents target.
+- Mirroring the direct write to both targets.
 
 Tests must not read the developer's real Claude or Codex history. Use fixtures and temporary directories only.
 
@@ -253,7 +248,7 @@ Supported drafting executables:
 - `claude`
 - `codex`
 
-Ritual launches the selected executable as an inherited terminal session and passes the generated drafting prompt as the final argv argument. Claude launches with `--dangerously-skip-permissions`; Codex launches with `--yolo`. The prompt tells the agent to write `.ritual/drafts/<skill-name>/SKILL.md`, and Ritual validates that file after the agent exits.
+Ritual launches the selected executable as an inherited terminal session and passes the generated drafting prompt as the final argv argument. Claude launches with `--dangerously-skip-permissions`; Codex launches with `--yolo`. The prompt tells the agent to write the first selected final skill target, and Ritual validates that file after the agent exits.
 
 The drafting prompt must come from an embedded, versioned template derived from `skill-creator`. Runtime behavior must not depend on the user's installed `skill-creator` files.
 
@@ -270,20 +265,17 @@ The template must require:
 
 The generated skill should be production-quality, not a stub. If the selected prompt cluster is too vague to draft a strong skill, Ritual should warn the user and offer to return to candidate selection.
 
-## Draft Workspace
+## Direct Skill Write
 
-Temporary drafts live under:
-
-```text
-.ritual/drafts/<skill-name>/SKILL.md
-```
+Ritual does not create a temporary draft workspace in the streamlined flow.
 
 Rules:
 
-- Create the draft workspace before final target writes.
-- Validate from the draft workspace.
-- Offer `$EDITOR` for human editing.
-- Ask whether to keep or delete the draft workspace after the final write.
+- Resolve selected target paths before launching the agent.
+- Ask for confirmation only when a selected target already exists.
+- Tell the launched agent to write the first selected target path directly.
+- Validate from that written target directory.
+- Copy the validated content to any additional selected target paths.
 - Do not store extracted history in the draft file unless the user explicitly keeps provenance.
 
 ## Validation
@@ -324,7 +316,7 @@ Requirements:
 - Never overwrite an existing skill without interactive confirmation.
 - Use atomic writes where practical.
 - Keep final writes idempotent after validation.
-- Treat global skill writes as higher-risk and confirm before writing.
+- Treat global skill writes as an explicit scope choice; ask again only when an existing skill would be overwritten.
 
 ## Release And Publishing
 

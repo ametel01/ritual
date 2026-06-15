@@ -111,11 +111,11 @@ describe("interactive session", () => {
       "codex-repeat.jsonl",
     );
     const runner = new MockRunner();
-    const draftPath = path.join(cwd, ".ritual", "drafts", "pr-review-workflow", "SKILL.md");
-    const launcher = new MockLauncher(draftPath);
+    const claudePath = path.join(cwd, ".claude", "skills", "pr-review-workflow", "SKILL.md");
+    const launcher = new MockLauncher(claudePath);
     const outputs: string[] = [];
     const prompts = new QueuePrompts({
-      confirms: [true, true, true, true],
+      confirms: [true],
       inputs: [fixturePath, "pr-review-workflow"],
       selects: ["codex", "candidate-1", "project", "claude"],
       checkboxes: [["claude", "codex"]],
@@ -137,15 +137,15 @@ describe("interactive session", () => {
     expect(launcher.invocations[0]?.invocation.command).toBe("claude");
     expect(launcher.invocations[0]?.invocation.args[0]).toBe("--dangerously-skip-permissions");
     expect(launcher.invocations[0]?.invocation.args.at(-1)).toContain(
-      "Create exactly one reusable agent skill and write it to this file:",
+      "Create exactly one reusable agent skill and write it directly to this file:",
     );
     expect(launcher.invocations[0]?.cwd).toBe(cwd);
 
-    const claudePath = path.join(cwd, ".claude", "skills", "pr-review-workflow", "SKILL.md");
     const codexPath = path.join(cwd, ".agents", "skills", "pr-review-workflow", "SKILL.md");
     await expect(readFile(claudePath, "utf8")).resolves.toContain("name: pr-review-workflow");
     await expect(readFile(codexPath, "utf8")).resolves.toContain("name: pr-review-workflow");
     expect(outputs.some((line) => line.includes("found 3 user prompts"))).toBe(true);
     expect(outputs.some((line) => line.includes("Matching prompts found locally"))).toBe(true);
+    expect(outputs.some((line) => line.includes(".ritual/drafts"))).toBe(false);
   });
 });

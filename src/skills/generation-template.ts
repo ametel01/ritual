@@ -45,21 +45,21 @@ export function buildGenerationHandoffPrompt(
     scope: SkillScope;
     ecosystems: SkillEcosystem[];
   },
-  draftPath: string,
+  skillPath: string,
 ): string {
   const prompt = buildGenerationPrompt(options)
     .replace(
       "Create exactly one reusable agent skill as a single SKILL.md file.",
-      `Create exactly one reusable agent skill and write it to this file:\n${draftPath}`,
+      `Create exactly one reusable agent skill and write it directly to this file:\n${skillPath}`,
     )
     .replace(
       "- Return only the contents of SKILL.md.",
-      `- Write only the contents of SKILL.md to ${draftPath}.`,
+      `- Write only the contents of SKILL.md to ${skillPath}.`,
     );
 
   return `${prompt}
 Additional handoff instructions:
-- Write the complete SKILL.md contents directly to ${draftPath}.
+- Write the complete SKILL.md contents directly to ${skillPath}.
 - Create the parent directory if it does not exist.
 - Do not print the skill instead of writing the file.
 - After writing the file, briefly summarize what you wrote and return control to the terminal.

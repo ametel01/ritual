@@ -30,18 +30,18 @@ The MVP has one interactive command. It does not expose subcommands or flags.
 4. Lets the user choose one repeated workflow and preview matching local prompts.
 5. Recommends project-local or global skill scope.
 6. Lets the user choose Claude, Codex/agents, or both output ecosystems.
-7. Lets the user choose Claude Code or Codex for local draft generation.
-8. Shows and confirms the local agent invocation before drafting.
-9. Writes an editable draft to `.ritual/drafts/<skill-name>/SKILL.md`.
-10. Validates the draft with built-in checks and optional `agnix`.
-11. Writes the same approved `SKILL.md` to all selected targets.
+7. Lets the user choose Claude Code or Codex for local skill generation.
+8. Opens the selected agent in the current terminal with the generated prompt.
+9. Writes the skill directly to the first selected target path.
+10. Validates the written skill with built-in checks and optional `agnix`.
+11. Mirrors the same approved `SKILL.md` to any additional selected targets.
 
 ## Privacy
 
 History discovery, extraction, clustering, and ranking are local-only. Ritual does
-not upload history. Drafting uses a local `claude` or `codex` executable only after
-explicit confirmation, because those tools may call external services depending on
-the user's configuration.
+not upload history. Skill generation uses a local `claude` or `codex` executable
+only after the user chooses it, because those tools may call external services
+depending on the user's configuration.
 
 Tests use fixtures and temporary directories. They do not read real Claude or Codex
 history.
