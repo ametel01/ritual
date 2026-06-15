@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ritual",
+      "name": "ritualai",
       "dependencies": {
         "@inquirer/prompts": "^7.10.1",
       },

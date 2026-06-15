@@ -9,7 +9,7 @@ a reusable `SKILL.md`.
 Published usage:
 
 ```bash
-bunx ritual@latest
+bunx ritualai@latest
 ```
 
 Local development usage:

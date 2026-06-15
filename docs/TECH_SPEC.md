@@ -5,7 +5,7 @@
 Ritual is a production-grade TypeScript CLI distributed through the npm registry and executed with:
 
 ```bash
-bunx ritual@latest
+bunx ritualai@latest
 ```
 
 The application has one interactive command, no MVP subcommands, and no MVP flags. Its technical design must support the PRD goal: scan local Claude and Codex history, identify repeated user prompts, guide the user through one approved candidate, draft a high-quality `SKILL.md`, validate it, and write it to selected skill targets.
@@ -16,13 +16,13 @@ The application has one interactive command, no MVP subcommands, and no MVP flag
 - Runtime target: active Node.js LTS.
 - Package format: ESM.
 - Distribution: npm registry.
-- User entrypoint: `bunx ritual@latest`.
-- Package `bin` entry: expose the `ritual` executable.
+- User entrypoint: `bunx ritualai@latest`.
+- Package `bin` entry: expose the `ritualai` executable and a `ritual` alias.
 - Published artifact: compiled JavaScript and required runtime assets only.
 - Source maps: included for debuggable production failures.
 - Release mechanism: automated GitHub Actions workflow on `v*` tag push.
 
-The CLI must not require a global install. `bunx ritual@latest` is the primary supported invocation.
+The CLI must not require a global install. `bunx ritualai@latest` is the primary supported invocation.
 
 ## Package Structure
 
@@ -322,7 +322,7 @@ Requirements:
 
 ## Release And Publishing
 
-Ritual is published to npm and must be runnable with `bunx ritual@latest`.
+Ritual is published to npm and must be runnable with `bunx ritualai@latest`.
 
 Release requirements:
 

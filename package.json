@@ -1,10 +1,11 @@
 {
-  "name": "ritual",
+  "name": "ritualai",
   "version": "0.1.0",
   "description": "Interactive CLI that turns repeated Claude and Codex prompts into reusable skills.",
   "type": "module",
   "packageManager": "bun@1.3.13",
   "bin": {
+    "ritualai": "./dist/cli/main.js",
     "ritual": "./dist/cli/main.js"
   },
   "files": [

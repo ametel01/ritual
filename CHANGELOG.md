@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Use Codex prompt history from `~/.codex/history.jsonl` as the default Codex source instead of full session transcripts.
 - Use Claude prompt history from `~/.claude/history.jsonl`, honoring `CLAUDE_CONFIG_DIR`, as the default Claude source instead of full session transcripts.
 - Configure Bun release publishing to use npm automation token authentication in CI.
+- Rename the npm package to `ritualai` while keeping `ritual` as a binary alias.
 
 ### Fixed
 
