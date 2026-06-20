@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - Exclude newer Codex `# AGENTS.md instructions` context records from user-prompt extraction.
+- Skip slash commands, low-signal acknowledgements, skill-call context, structured payloads, terminal transcripts, standalone attachments, injected runtime events, local page checks, rendered output dumps, app logs, risk reports, CI log dumps, generated handoffs, assistant completion summaries, and assistant review reports during prompt extraction, and deduplicate mirrored prompt-history/session records before ranking or dumping prompts.
 
 ## [0.1.1] - 2026-06-15
 

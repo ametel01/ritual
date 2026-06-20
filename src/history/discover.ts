@@ -11,6 +11,7 @@ import type {
 } from "./types.js";
 
 const HISTORY_EXTENSIONS = new Set([".json", ".jsonl"]);
+const DUPLICATE_PROMPT_WINDOW_MS = 60_000;
 
 export async function discoverHistorySources(options: HistoryDiscoveryOptions): Promise<{
   sources: HistorySource[];
@@ -83,11 +84,88 @@ export async function scanHistorySources(sources: HistorySource[]): Promise<Hist
     }
   }
 
+  const dedupedSourceResults = dedupeSourcePrompts(sourceResults);
+
   return {
-    sources: sourceResults,
-    prompts: sourceResults.flatMap((result) => result.prompts),
+    sources: dedupedSourceResults,
+    prompts: dedupedSourceResults.flatMap((result) => result.prompts),
     diagnostics,
   };
+}
+
+function dedupeSourcePrompts(sourceResults: SourceScanResult[]): SourceScanResult[] {
+  const keptPromptIds = new Set(
+    dedupePrompts(sourceResults.flatMap((result) => result.prompts)).map((prompt) => prompt.id),
+  );
+
+  return sourceResults.map((result) => ({
+    ...result,
+    prompts: result.prompts.filter((prompt) => keptPromptIds.has(prompt.id)),
+  }));
+}
+
+function dedupePrompts(prompts: SourceScanResult["prompts"]): SourceScanResult["prompts"] {
+  const groups = new Map<string, SourceScanResult["prompts"]>();
+  for (const prompt of prompts) {
+    const key = `${prompt.source}:${normalizePromptText(prompt.text)}`;
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, [prompt]);
+    } else {
+      group.push(prompt);
+    }
+  }
+
+  const keptIds = new Set<string>();
+  for (const group of groups.values()) {
+    const kept = dedupePromptGroup(group);
+    for (const prompt of kept) {
+      keptIds.add(prompt.id);
+    }
+  }
+
+  return prompts.filter((prompt) => keptIds.has(prompt.id));
+}
+
+function dedupePromptGroup(prompts: SourceScanResult["prompts"]): SourceScanResult["prompts"] {
+  const sorted = [...prompts].sort((left, right) => promptTimestamp(right) - promptTimestamp(left));
+  const kept: SourceScanResult["prompts"] = [];
+
+  for (const prompt of sorted) {
+    if (kept.some((existing) => isDuplicatePrompt(prompt, existing))) {
+      continue;
+    }
+    kept.push(prompt);
+  }
+
+  return kept;
+}
+
+function isDuplicatePrompt(
+  prompt: SourceScanResult["prompts"][number],
+  existing: SourceScanResult["prompts"][number],
+): boolean {
+  const promptTimestampValue = promptTimestamp(prompt);
+  const existingTimestampValue = promptTimestamp(existing);
+  if (
+    promptTimestampValue === Number.NEGATIVE_INFINITY ||
+    existingTimestampValue === Number.NEGATIVE_INFINITY
+  ) {
+    return promptTimestampValue === existingTimestampValue;
+  }
+  return Math.abs(promptTimestampValue - existingTimestampValue) <= DUPLICATE_PROMPT_WINDOW_MS;
+}
+
+function promptTimestamp(prompt: SourceScanResult["prompts"][number]): number {
+  if (prompt.createdAt === undefined) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const timestamp = Date.parse(prompt.createdAt);
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
+function normalizePromptText(text: string): string {
+  return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 async function discoverFiles(rootPath: string): Promise<string[]> {

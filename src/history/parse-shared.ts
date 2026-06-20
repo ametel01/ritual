@@ -128,14 +128,16 @@ export function toExtractedPrompts(params: {
   sourcePath: string;
   prefix: string;
 }): ExtractedPrompt[] {
-  return params.candidates.map((candidate, index) => ({
-    id: `${params.prefix}:${index + 1}`,
-    source: params.source,
-    sourcePath: params.sourcePath,
-    text: candidate.text,
-    ...(candidate.sessionId === undefined ? {} : { sessionId: candidate.sessionId }),
-    ...(candidate.createdAt === undefined ? {} : { createdAt: candidate.createdAt }),
-  }));
+  return params.candidates
+    .filter((candidate) => isReusablePromptText(candidate.text))
+    .map((candidate, index) => ({
+      id: `${params.prefix}:${index + 1}`,
+      source: params.source,
+      sourcePath: params.sourcePath,
+      text: candidate.text,
+      ...(candidate.sessionId === undefined ? {} : { sessionId: candidate.sessionId }),
+      ...(candidate.createdAt === undefined ? {} : { createdAt: candidate.createdAt }),
+    }));
 }
 
 function isUserRecord(record: Record<string, unknown>): boolean {
@@ -207,7 +209,208 @@ function isInjectedContextText(text: string): boolean {
     trimmed.startsWith("<apps_instructions>") ||
     trimmed.startsWith("<skills_instructions>") ||
     trimmed.startsWith("<plugins_instructions>") ||
+    trimmed.startsWith("<turn_aborted>") ||
+    trimmed.startsWith("<subagent_notification>") ||
     trimmed.startsWith("# AGENTS.md instructions")
+  );
+}
+
+function isReusablePromptText(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.startsWith("/")) {
+    return false;
+  }
+  if (isSkillCallText(trimmed)) {
+    return false;
+  }
+  if (
+    isLowSignalAcknowledgementText(trimmed) ||
+    isStructuredPayloadText(trimmed) ||
+    isTerminalTranscriptText(trimmed) ||
+    isStandaloneAttachmentText(trimmed) ||
+    isGeneratedHandoffText(trimmed) ||
+    isLocalPageInspectionText(trimmed) ||
+    isRenderedOutputDumpText(trimmed) ||
+    isLogDumpText(trimmed) ||
+    isRiskReportDumpText(trimmed) ||
+    isCiLogDumpText(trimmed)
+  ) {
+    return false;
+  }
+  return !isLikelyAssistantResponseText(trimmed);
+}
+
+function isSkillCallText(text: string): boolean {
+  if (text.includes("<skill>") && text.includes("</skill>")) {
+    return true;
+  }
+  const skillNamePattern = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*";
+  return (
+    new RegExp(`(^|\\s)\\[\\$${skillNamePattern}\\]\\([^)]+\\)`).test(text) ||
+    new RegExp(`(^|\\s)\\$${skillNamePattern}\\b`).test(text)
+  );
+}
+
+function isLowSignalAcknowledgementText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  if (normalized.startsWith("agree,") && normalized.split(/\s+/).length <= 4) {
+    return true;
+  }
+  return [
+    "agree",
+    "agreed",
+    "ok",
+    "okay",
+    "yes",
+    "no",
+    "nope",
+    "yep",
+    "proceed",
+    "continue",
+    "go ahead",
+    "sounds good",
+    "do it",
+    "fix it",
+    "proceed with your recommendation",
+    "resume",
+    "clear",
+    "agree with your suggestion",
+    "agree with your proposal",
+    "agree with your recommendation",
+  ].includes(normalized);
+}
+
+function isStructuredPayloadText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.some(isStructuredPromptPayload);
+    }
+    return isStructuredPromptPayload(parsed);
+  } catch {
+    return false;
+  }
+}
+
+function isStructuredPromptPayload(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    Object.hasOwn(value, "system") ||
+    Object.hasOwn(value, "messages") ||
+    Object.hasOwn(value, "developer") ||
+    Object.hasOwn(value, "instructions")
+  );
+}
+
+function isTerminalTranscriptText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return /^[\w.-]+@[\w.-]+\s+\S+\s+% /.test(normalized) || normalized.startsWith("Last login:");
+}
+
+function isStandaloneAttachmentText(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    trimmed.startsWith("<image ") ||
+    /^["']?\/.+\.(png|jpe?g|webp|gif|heic|pdf)["']?$/i.test(trimmed) ||
+    /^["']?\/.*screenshot/i.test(trimmed)
+  );
+}
+
+function isGeneratedHandoffText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    normalized.startsWith("fix the selected agent skills findings in this repository.") ||
+    normalized.startsWith(
+      "you are operating inside an existing software repository. your task is",
+    ) ||
+    (normalized.startsWith("repository: /") && normalized.includes("read-only")) ||
+    (normalized.startsWith("repo: /") && normalized.includes("architecture")) ||
+    normalized.startsWith("read-only architecture exploration in /") ||
+    (normalized.startsWith("we are in /") && normalized.includes("user invoked improve")) ||
+    (normalized.startsWith("explore /") && normalized.includes("architectural"))
+  );
+}
+
+function isLocalPageInspectionText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    normalized.startsWith("now check this page ") &&
+    (normalized.includes("http://localhost") || normalized.includes("https://localhost"))
+  );
+}
+
+function isRenderedOutputDumpText(text: string): boolean {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith("┌") || trimmed.startsWith("╭") || trimmed.startsWith("│");
+}
+
+function isLogDumpText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z)\s+(ERROR|WARN|INFO|DEBUG)\b/.test(
+    normalized,
+  );
+}
+
+function isRiskReportDumpText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return normalized.startsWith("i still have all this ## risk reasons");
+}
+
+function isCiLogDumpText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    normalized.startsWith("why the ci is failing ") &&
+    (normalized.includes("getting action download") ||
+      normalized.includes("prepare all required actions"))
+  );
+}
+
+function isLikelyAssistantResponseText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  if (
+    normalized.startsWith("committed and pushed:") ||
+    normalized.startsWith("committed all current changes")
+  ) {
+    return true;
+  }
+  if (normalized.startsWith("implemented ")) {
+    return true;
+  }
+  if (isLikelyAssistantReviewReport(normalized)) {
+    return true;
+  }
+  return normalized.startsWith("fixed.") && hasAssistantSummarySection(normalized);
+}
+
+function isLikelyAssistantReviewReport(text: string): boolean {
+  const startsLikeReviewReport =
+    text.startsWith("i found some issue in the current diff") ||
+    text.startsWith("i found some issues in the current diff");
+  return startsLikeReviewReport && hasAssistantReviewReportMarker(text);
+}
+
+function hasAssistantReviewReportMarker(text: string): boolean {
+  return (
+    text.includes("verification run:") ||
+    text.includes("verification:") ||
+    text.includes("validation:") ||
+    text.includes("i reproduced ") ||
+    text.includes("i did not run the test")
+  );
+}
+
+function hasAssistantSummarySection(text: string): boolean {
+  return (
+    text.includes("changed:") ||
+    text.includes("validation:") ||
+    text.includes("verification passed:") ||
+    text.includes("blocked:")
   );
 }
 
