@@ -811,31 +811,26 @@ describe("history scanning", () => {
     const homeDir = await mkdtempInTest("ritual-history-scan-");
     const smallPath = path.join(homeDir, "small.jsonl");
     const bigPath = path.join(homeDir, "big.jsonl");
-    await writeFile(smallPath, JSON.stringify({ ts: 1775423768, text: "review this PR" }), "utf8");
-    await writeFile(
-      bigPath,
-      JSON.stringify({
-        ts: 1775423768,
-        text: "review this PR, this file intentionally exceeds the test limit",
-      }),
-      "utf8",
-    );
+    const smallRecord = JSON.stringify({ text: "x" });
+    const bigRecord = JSON.stringify({
+      text: "review this PR, this file intentionally exceeds the test limit",
+    });
+    await writeFile(smallPath, smallRecord, "utf8");
+    await writeFile(bigPath, bigRecord, "utf8");
 
     const result = await scanHistorySources(
       [
         { kind: "codex", path: smallPath },
         { kind: "codex", path: bigPath },
       ],
-      { maxFileBytes: 10 },
+      { maxFileBytes: smallRecord.length },
     );
 
-    expect(result.prompts.map((prompt) => prompt.text)).toEqual(["review this PR"]);
-    expect(
-      result.sources.find((source) => source.source.path === smallPath)?.prompts.length,
-    ).toBe(1);
-    expect(
-      result.sources.find((source) => source.source.path === bigPath)?.prompts,
-    ).toEqual([]);
+    expect(result.prompts.map((prompt) => prompt.text)).toEqual(["x"]);
+    expect(result.sources.find((source) => source.source.path === smallPath)?.prompts.length).toBe(
+      1,
+    );
+    expect(result.sources.find((source) => source.source.path === bigPath)?.prompts).toEqual([]);
     expect(
       result.sources
         .find((source) => source.source.path === bigPath)
