@@ -92,6 +92,10 @@ describe("history parsers", () => {
               },
               {
                 type: "input_text",
+                text: "# AGENTS.md instructions\n\n<INSTRUCTIONS>internal</INSTRUCTIONS>",
+              },
+              {
+                type: "input_text",
                 text: "<environment_context><cwd>/tmp/project</cwd></environment_context>",
               },
             ],
@@ -154,7 +158,7 @@ describe("history parsers", () => {
 });
 
 describe("history discovery", () => {
-  it("uses Claude prompt history as the default Claude source", async () => {
+  it("uses Claude prompt history and project transcripts as default Claude sources", async () => {
     const homeDir = await mkdtempInTest("ritual-history-home-");
     await mkdir(path.join(homeDir, ".claude", "projects", "-tmp-project"), {
       recursive: true,
@@ -170,10 +174,14 @@ describe("history discovery", () => {
 
     expect(result.sources).toEqual([
       { kind: "claude", path: path.join(homeDir, ".claude", "history.jsonl") },
+      {
+        kind: "claude",
+        path: path.join(homeDir, ".claude", "projects", "-tmp-project", "session.jsonl"),
+      },
     ]);
   });
 
-  it("honors CLAUDE_CONFIG_DIR when discovering Claude prompt history", async () => {
+  it("honors CLAUDE_CONFIG_DIR when discovering Claude history", async () => {
     const homeDir = await mkdtempInTest("ritual-history-home-");
     const claudeConfigDir = path.join(homeDir, ".claude-work");
     await mkdir(claudeConfigDir, { recursive: true });
@@ -191,7 +199,7 @@ describe("history discovery", () => {
     ]);
   });
 
-  it("uses Codex prompt history as the default Codex source", async () => {
+  it("uses Codex prompt history and session transcripts as default Codex sources", async () => {
     const homeDir = await mkdtempInTest("ritual-history-home-");
     await mkdir(path.join(homeDir, ".codex", "sessions", "2026", "06", "15"), {
       recursive: true,
@@ -207,6 +215,38 @@ describe("history discovery", () => {
 
     expect(result.sources).toEqual([
       { kind: "codex", path: path.join(homeDir, ".codex", "history.jsonl") },
+      {
+        kind: "codex",
+        path: path.join(homeDir, ".codex", "sessions", "2026", "06", "15", "rollout.jsonl"),
+      },
+    ]);
+  });
+
+  it("uses Codex archived sessions and CODEX_HOME", async () => {
+    const homeDir = await mkdtempInTest("ritual-history-home-");
+    const codexHome = path.join(homeDir, ".codex-work");
+    await mkdir(path.join(codexHome, "archived_sessions", "2026", "06", "15"), {
+      recursive: true,
+    });
+    await writeFile(path.join(codexHome, "history.jsonl"), "", "utf8");
+    await writeFile(
+      path.join(codexHome, "archived_sessions", "2026", "06", "15", "rollout.jsonl"),
+      "",
+      "utf8",
+    );
+
+    const result = await discoverHistorySources({
+      cwd: "/tmp/project",
+      homeDir,
+      env: { CODEX_HOME: codexHome },
+    });
+
+    expect(result.sources).toEqual([
+      { kind: "codex", path: path.join(codexHome, "history.jsonl") },
+      {
+        kind: "codex",
+        path: path.join(codexHome, "archived_sessions", "2026", "06", "15", "rollout.jsonl"),
+      },
     ]);
   });
 });

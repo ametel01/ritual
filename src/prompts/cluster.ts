@@ -29,6 +29,7 @@ export function clusterPrompts(
     .filter((cluster) => cluster.prompts.length >= options.nearMissThreshold)
     .map((cluster, index) => {
       const sourcePrompts = cluster.prompts.map((prompt) => prompt.prompt);
+      const representativePrompts = recentPrompts(sourcePrompts).slice(0, 3);
       const coherence = clusterCoherence(cluster);
       const name = candidateName(cluster.prompts.flatMap((prompt) => prompt.tokens));
       const count = sourcePrompts.length;
@@ -37,9 +38,11 @@ export function clusterPrompts(
       return {
         id: `candidate-${index + 1}`,
         name,
-        summary: summaryFromPrompt(sourcePrompts[0]?.text ?? name),
+        summary: summaryFromPrompt(
+          representativePrompts[0]?.text ?? sourcePrompts[0]?.text ?? name,
+        ),
         prompts: sourcePrompts,
-        representativePrompts: sourcePrompts.slice(0, 3),
+        representativePrompts,
         count,
         coherence,
         rankScore,
@@ -132,6 +135,7 @@ async function buildCandidate(
   options: ClusterOptions,
 ): Promise<WorkflowCandidate> {
   const sourcePrompts = cluster.prompts.map((prompt) => prompt.prompt);
+  const representativePrompts = recentPrompts(sourcePrompts).slice(0, 3);
   const coherence = await clusterCoherenceAsync(cluster);
   const name = candidateName(cluster.prompts.flatMap((prompt) => prompt.tokens));
   const count = sourcePrompts.length;
@@ -140,9 +144,9 @@ async function buildCandidate(
   return {
     id: `candidate-${index + 1}`,
     name,
-    summary: summaryFromPrompt(sourcePrompts[0]?.text ?? name),
+    summary: summaryFromPrompt(representativePrompts[0]?.text ?? sourcePrompts[0]?.text ?? name),
     prompts: sourcePrompts,
-    representativePrompts: sourcePrompts.slice(0, 3),
+    representativePrompts,
     count,
     coherence,
     rankScore,
@@ -198,6 +202,21 @@ function averageDetailScore(prompts: ExtractedPrompt[]): number {
     return sum + Math.min(words / 35, 1);
   }, 0);
   return prompts.length === 0 ? 0 : total / prompts.length;
+}
+
+function recentPrompts(prompts: ExtractedPrompt[]): ExtractedPrompt[] {
+  return prompts
+    .map((prompt, index) => ({ prompt, index, timestamp: promptTimestamp(prompt) }))
+    .sort((left, right) => right.timestamp - left.timestamp || left.index - right.index)
+    .map((entry) => entry.prompt);
+}
+
+function promptTimestamp(prompt: ExtractedPrompt): number {
+  if (prompt.createdAt === undefined) {
+    return 0;
+  }
+  const timestamp = Date.parse(prompt.createdAt);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 function candidateName(tokens: string[]): string {

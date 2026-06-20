@@ -12,15 +12,30 @@ Published usage:
 bunx ritualai@latest
 ```
 
+Dump the latest 100 extracted user prompts, newest first:
+
+```bash
+bunx ritualai@latest prompts
+bunx ritualai@latest --prompts
+```
+
+Use a different prompt count:
+
+```bash
+bunx ritualai@latest prompts --limit 25
+```
+
 Local development usage:
 
 ```bash
 bun install --frozen-lockfile
 bun run build
 node dist/cli/main.js
+node dist/cli/main.js prompts
+bun run dev --prompts
 ```
 
-The MVP has one interactive command. It does not expose subcommands or flags.
+Running without arguments starts the interactive skill-generation flow.
 
 ## What The CLI Does
 
@@ -35,6 +50,9 @@ The MVP has one interactive command. It does not expose subcommands or flags.
 9. Writes the skill directly to the first selected target path.
 10. Validates the written skill with built-in checks and optional `agnix`.
 11. Mirrors the same approved `SKILL.md` to any additional selected targets.
+
+The `prompts` command skips candidate ranking and writes raw extracted user
+prompts to stdout as tab-separated `createdAt`, source, and prompt text fields.
 
 ## Privacy
 
@@ -51,7 +69,11 @@ history.
 Ritual scans these defaults when they exist:
 
 - Claude: `~/.claude/history.jsonl` (or `$CLAUDE_CONFIG_DIR/history.jsonl`)
-- Codex: `~/.codex/history.jsonl`
+- Claude transcripts: `~/.claude/projects/**/*.jsonl` (or
+  `$CLAUDE_CONFIG_DIR/projects/**/*.jsonl`)
+- Codex: `$CODEX_HOME/history.jsonl` (defaults to `~/.codex/history.jsonl`)
+- Codex transcripts: `$CODEX_HOME/sessions/**/*.jsonl` and
+  `$CODEX_HOME/archived_sessions/**/*.jsonl`
 
 The interactive flow can add one extra Claude or Codex history file or directory.
 Malformed records produce diagnostics and do not stop other files from being

@@ -1,8 +1,14 @@
 import type { ExtractedPrompt } from "../../src/history/types.js";
 import { rankWorkflowCandidates, rankWorkflowCandidatesAsync } from "../../src/prompts/rank.js";
 
-function prompt(id: string, text: string): ExtractedPrompt {
-  return { id, source: "codex", sourcePath: "/tmp/history.jsonl", text };
+function prompt(id: string, text: string, createdAt?: string): ExtractedPrompt {
+  return {
+    id,
+    source: "codex",
+    sourcePath: "/tmp/history.jsonl",
+    text,
+    ...(createdAt === undefined ? {} : { createdAt }),
+  };
 }
 
 describe("prompt ranking", () => {
@@ -20,6 +26,33 @@ describe("prompt ranking", () => {
     expect(candidates[0]?.count).toBe(3);
     expect(candidates[0]?.representativePrompts[0]?.text).toBe(prompts[0]?.text);
     expect(candidates[0]?.rankReason).toContain("good skill candidate");
+  });
+
+  it("shows the most recent matching prompts as representatives", () => {
+    const prompts = [
+      prompt(
+        "1",
+        "Review this TypeScript PR for correctness bugs and missing Vitest tests.",
+        "2026-06-01T00:00:00.000Z",
+      ),
+      prompt(
+        "2",
+        "Please review this TypeScript pull request for bugs and missing tests.",
+        "2026-06-03T00:00:00.000Z",
+      ),
+      prompt(
+        "3",
+        "Review this TypeScript PR for CI risks, bugs, and missing coverage.",
+        "2026-06-02T00:00:00.000Z",
+      ),
+    ];
+
+    const candidates = rankWorkflowCandidates(prompts);
+
+    expect(candidates[0]?.representativePrompts.map((representative) => representative.id)).toEqual(
+      ["2", "3", "1"],
+    );
+    expect(candidates[0]?.summary).toBe(prompts[1]?.text);
   });
 
   it("supports async ranking for interactive progress rendering", async () => {

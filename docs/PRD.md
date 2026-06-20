@@ -8,7 +8,7 @@ The product wedge is:
 
 > Your coding-agent history already contains the workflows you repeat. This CLI finds them, ranks them, and turns the best ones into reusable skills.
 
-Ritual is not a history viewer. The history scan exists only to discover repeated workflows that are good candidates for skills. The MVP succeeds when a user creates one high-quality reusable `SKILL.md` from repeated Claude or Codex prompts.
+Ritual is not a full-featured history viewer. The primary history scan exists to discover repeated workflows that are good candidates for skills. The MVP succeeds when a user creates one high-quality reusable `SKILL.md` from repeated Claude or Codex prompts.
 
 ## Problem
 
@@ -24,9 +24,9 @@ Existing history tools help users inspect what happened. Existing skill generato
 
 ## Product Principles
 
-- The interface has one command: `bunx ritualai@latest`.
-- There are no MVP subcommands.
-- There are no MVP CLI flags.
+- The default interface is `bunx ritualai@latest`.
+- Lightweight inspection can use `bunx ritualai@latest prompts` or `bunx ritualai@latest --prompts`.
+- The default skill-generation flow must not require flags.
 - All decisions happen through interactive prompts.
 - The primary artifact is one high-quality `SKILL.md`.
 - The user must approve before any skill is written.
@@ -41,6 +41,7 @@ Existing history tools help users inspect what happened. Existing skill generato
 - Rank candidates by recurrence, coherence, and likely usefulness.
 - Present top candidates interactively.
 - Let the user approve, merge, rename, or reject candidates.
+- Let users dump the latest extracted prompts in terminal date order for inspection.
 - Generate one skill per run.
 - Use an embedded, versioned skill-generation prompt derived from `skill-creator`.
 - Call a local coding-agent executable, such as `claude` or `codex`, only after user approval.
@@ -53,8 +54,8 @@ Existing history tools help users inspect what happened. Existing skill generato
 - Fully automatic skill generation without review.
 - A full-featured agent history browser.
 - Batch skill generation.
-- Subcommand-driven workflows.
-- CLI flags for MVP behavior.
+- Subcommand-driven skill-generation workflows.
+- CLI flags for the default skill-generation flow.
 - Cloud sync, hosted accounts, or shared team skill registries.
 - Uploading history for semantic clustering.
 - Deep semantic indexing across complete assistant responses.
@@ -85,8 +86,10 @@ Existing history tools help users inspect what happened. Existing skill generato
 ### Invocation
 
 - The MVP command is `bunx ritualai@latest`.
-- The MVP must not require users to learn subcommands.
-- The MVP must not require users to remember flags.
+- The default flow must not require users to learn subcommands.
+- The default flow must not require users to remember flags.
+- `bunx ritualai@latest prompts` and `bunx ritualai@latest --prompts` dump the latest extracted prompts to stdout.
+- `bunx ritualai@latest prompts --limit N` changes the dump count.
 - Runtime choices must be made through interactive prompts.
 - Internal implementation may still use modules for scan, cluster, draft, validate, and write.
 

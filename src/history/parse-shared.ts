@@ -207,7 +207,7 @@ function isInjectedContextText(text: string): boolean {
     trimmed.startsWith("<apps_instructions>") ||
     trimmed.startsWith("<skills_instructions>") ||
     trimmed.startsWith("<plugins_instructions>") ||
-    trimmed.startsWith("# AGENTS.md instructions for ")
+    trimmed.startsWith("# AGENTS.md instructions")
   );
 }
 

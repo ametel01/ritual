@@ -36,6 +36,7 @@ export type HistoryScanResult = {
 
 export type HistoryDiscoveryEnvironment = Record<string, string | undefined> & {
   CLAUDE_CONFIG_DIR?: string;
+  CODEX_HOME?: string;
 };
 
 export type HistoryDiscoveryOptions = {

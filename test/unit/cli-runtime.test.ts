@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SessionResult } from "../../src/cli/interactive.js";
+import type { PromptDumpOptions, PromptDumpResult } from "../../src/cli/prompt-dump.js";
 import { PromptCancelledError } from "../../src/cli/prompts.js";
 import {
   isDirectEntrypoint,
@@ -40,7 +41,7 @@ describe("cli runtime", () => {
     );
   });
 
-  it("preserves Ritual's one-command, no-flags public contract", async () => {
+  it("rejects unknown subcommands and flags", async () => {
     const stderr: string[] = [];
     const exitCodes: number[] = [];
     const stdin = new FakeStdin();
@@ -56,7 +57,82 @@ describe("cli runtime", () => {
     });
 
     expect(stdin.unrefCalls).toBe(1);
-    expect(stderr).toEqual(["Ritual has one interactive command and no subcommands or flags."]);
+    expect(stderr).toEqual(["Usage: ritual [prompts|--prompts [--limit N]]"]);
+    expect(exitCodes).toEqual([1]);
+  });
+
+  it("runs the prompt dump command with the default limit", async () => {
+    const stdin = new FakeStdin();
+    const dumpOptions: PromptDumpOptions[] = [];
+
+    await runCli({
+      argv: ["node", "ritual", "prompts"],
+      stdin,
+      output: { stdout: () => undefined, stderr: () => undefined },
+      setExitCode: () => undefined,
+      async runInteractive(): Promise<SessionResult> {
+        throw new Error("interactive session should not run");
+      },
+      async runPromptDump(options): Promise<PromptDumpResult> {
+        dumpOptions.push(options);
+        return { status: "completed", count: 0 };
+      },
+    });
+
+    expect(dumpOptions).toHaveLength(1);
+    expect(dumpOptions[0]?.limit).toBe(100);
+    expect(stdin.unrefCalls).toBe(1);
+  });
+
+  it("runs the prompt dump command with an explicit limit", async () => {
+    const dumpOptions: PromptDumpOptions[] = [];
+
+    await runCli({
+      argv: ["node", "ritual", "prompts", "--limit", "12"],
+      stdin: new FakeStdin(),
+      output: { stdout: () => undefined, stderr: () => undefined },
+      setExitCode: () => undefined,
+      async runPromptDump(options): Promise<PromptDumpResult> {
+        dumpOptions.push(options);
+        return { status: "completed", count: 0 };
+      },
+    });
+
+    expect(dumpOptions[0]?.limit).toBe(12);
+  });
+
+  it("runs the prompt dump command through the --prompts alias", async () => {
+    const dumpOptions: PromptDumpOptions[] = [];
+
+    await runCli({
+      argv: ["node", "ritual", "--prompts", "--limit", "50"],
+      stdin: new FakeStdin(),
+      output: { stdout: () => undefined, stderr: () => undefined },
+      setExitCode: () => undefined,
+      async runPromptDump(options): Promise<PromptDumpResult> {
+        dumpOptions.push(options);
+        return { status: "completed", count: 0 };
+      },
+    });
+
+    expect(dumpOptions[0]?.limit).toBe(50);
+  });
+
+  it("rejects invalid prompt dump limits", async () => {
+    const stderr: string[] = [];
+    const exitCodes: number[] = [];
+
+    await runCli({
+      argv: ["node", "ritual", "prompts", "--limit", "0"],
+      stdin: new FakeStdin(),
+      output: { stdout: () => undefined, stderr: (message) => stderr.push(message) },
+      setExitCode: (code) => exitCodes.push(code),
+      async runPromptDump(): Promise<PromptDumpResult> {
+        throw new Error("prompt dump should not run");
+      },
+    });
+
+    expect(stderr).toEqual(["Prompt dump limit must be a positive integer."]);
     expect(exitCodes).toEqual([1]);
   });
 

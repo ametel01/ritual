@@ -1,5 +1,6 @@
 export type { InteractiveOptions, SessionResult } from "./cli/interactive.js";
 export { runInteractiveSession } from "./cli/interactive.js";
+export { formatPromptLine, latestPrompts, runPromptDump } from "./cli/prompt-dump.js";
 export { discoverHistorySources, scanHistorySources } from "./history/discover.js";
 export { parseClaudeHistoryFile } from "./history/parse-claude.js";
 export { parseCodexHistoryFile } from "./history/parse-codex.js";

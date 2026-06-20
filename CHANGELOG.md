@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add `ritual prompts` and `ritual --prompts` to dump the latest extracted user prompts in descending date order, with `--limit`/`-n` support for changing the default 100-prompt count.
+
+### Changed
+
+- Scan Claude project transcripts plus Codex active and archived session transcripts by default, while preserving prompt-history file discovery and honoring `CLAUDE_CONFIG_DIR` and `CODEX_HOME`.
+- Prefer the most recent matching prompts in workflow previews so newly repeated prompts are visible when reviewing candidates.
+
+### Fixed
+
+- Exclude newer Codex `# AGENTS.md instructions` context records from user-prompt extraction.
+
 ## [0.1.1] - 2026-06-15
 
 ### Fixed

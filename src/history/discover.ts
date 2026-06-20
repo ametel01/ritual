@@ -18,9 +18,13 @@ export async function discoverHistorySources(options: HistoryDiscoveryOptions): 
 }> {
   const diagnostics: Diagnostic[] = [];
   const claudeConfigDir = options.env?.CLAUDE_CONFIG_DIR ?? path.join(options.homeDir, ".claude");
+  const codexHome = options.env?.CODEX_HOME ?? path.join(options.homeDir, ".codex");
   const candidates: HistorySource[] = [
     { kind: "claude", path: path.join(claudeConfigDir, "history.jsonl") },
-    { kind: "codex", path: path.join(options.homeDir, ".codex", "history.jsonl") },
+    { kind: "claude", path: path.join(claudeConfigDir, "projects") },
+    { kind: "codex", path: path.join(codexHome, "history.jsonl") },
+    { kind: "codex", path: path.join(codexHome, "sessions") },
+    { kind: "codex", path: path.join(codexHome, "archived_sessions") },
     ...(options.extraSources ?? []),
   ];
 
@@ -105,7 +109,7 @@ async function discoverFiles(rootPath: string): Promise<string[]> {
       return [];
     }),
   );
-  return nested.flat();
+  return nested.flat().sort();
 }
 
 async function exists(filePath: string): Promise<boolean> {

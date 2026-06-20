@@ -8,7 +8,7 @@ Ritual is a production-grade TypeScript CLI distributed through the npm registry
 bunx ritualai@latest
 ```
 
-The application has one interactive command, no MVP subcommands, and no MVP flags. Its technical design must support the PRD goal: scan local Claude and Codex history, identify repeated user prompts, guide the user through one approved candidate, draft a high-quality `SKILL.md`, validate it, and write it to selected skill targets.
+The default application command is the interactive skill-generation flow. The CLI also exposes a narrow `prompts` inspection command that dumps extracted user prompts to stdout without ranking, clustering, or writing skills.
 
 ## Runtime And Distribution
 
@@ -33,6 +33,7 @@ src/
   cli/
     main.ts
     interactive.ts
+    prompt-dump.ts
   history/
     discover.ts
     parse-codex.ts
@@ -71,7 +72,7 @@ Boundaries:
 
 ## Interactive Application Flow
 
-The entrypoint must run the complete guided flow:
+Running without arguments must run the complete guided flow:
 
 1. Discover Claude and Codex history sources.
 2. Show source diagnostics and extraction counts.
@@ -91,6 +92,19 @@ The entrypoint must run the complete guided flow:
 16. Mirror the same `SKILL.md` to any additional selected targets.
 
 All runtime decisions must be interactive prompts.
+
+## Prompt Dump Flow
+
+Running `ritual prompts` or `ritual --prompts` must:
+
+1. Discover the same default Claude and Codex history sources as the interactive flow.
+2. Extract user prompts only.
+3. Sort prompts by `createdAt` descending, with undated prompts last.
+4. Write at most 100 prompts by default.
+5. Accept `--limit N` or `-n N` to override the prompt count.
+6. Format each line as tab-separated `createdAt`, source, and prompt text fields.
+
+The command must not cluster prompts, launch an agent, or write skill files.
 
 ## TypeScript Standards
 

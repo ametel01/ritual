@@ -1,7 +1,11 @@
 import { realpathSync } from "node:fs";
+import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 import { runInteractiveSession, type SessionResult } from "./interactive.js";
+import { type PromptDumpOptions, type PromptDumpResult, runPromptDump } from "./prompt-dump.js";
 import { isPromptCancelledError } from "./prompts.js";
+
+const DEFAULT_PROMPT_DUMP_LIMIT = 100;
 
 export type CliOutput = {
   stdout(message: string): void;
@@ -19,6 +23,7 @@ export type RunCliOptions = {
   readonly output?: CliOutput;
   readonly setExitCode?: (code: number) => void;
   readonly runInteractive?: () => Promise<SessionResult>;
+  readonly runPromptDump?: (options: PromptDumpOptions) => Promise<PromptDumpResult>;
 };
 
 export async function runCli(options: RunCliOptions = {}): Promise<void> {
@@ -37,18 +42,29 @@ export async function runCli(options: RunCliOptions = {}): Promise<void> {
     ((code: number) => {
       process.exitCode = code;
     });
+  const command = parseCliCommand(args);
 
-  if (args.length > 0) {
-    output.stderr("Ritual has one interactive command and no subcommands or flags.");
+  if (command.kind === "error") {
+    output.stderr(command.message);
     setExitCode(1);
     unrefStdin(stdin);
     return;
   }
 
   try {
-    const result = await (options.runInteractive ?? runInteractiveSession)();
-    if (result.status === "cancelled") {
-      output.stdout(`Ritual stopped: ${result.reason}`);
+    if (command.kind === "prompts") {
+      await (options.runPromptDump ?? runPromptDump)({
+        cwd: process.cwd(),
+        homeDir: os.homedir(),
+        env: process.env,
+        limit: command.limit,
+        output: { write: output.stdout },
+      });
+    } else {
+      const result = await (options.runInteractive ?? runInteractiveSession)();
+      if (result.status === "cancelled") {
+        output.stdout(`Ritual stopped: ${result.reason}`);
+      }
     }
   } catch (error) {
     handleTopLevelError(error, output, setExitCode);
@@ -59,6 +75,41 @@ export async function runCli(options: RunCliOptions = {}): Promise<void> {
 
 export function normalizeHelpInvocation(args: readonly string[]): string[] {
   return args.map((arg) => (arg === "help" ? "--help" : arg));
+}
+
+type CliCommand =
+  | { kind: "interactive" }
+  | { kind: "prompts"; limit: number }
+  | { kind: "error"; message: string };
+
+function parseCliCommand(args: readonly string[]): CliCommand {
+  if (args.length === 0) {
+    return { kind: "interactive" };
+  }
+  if (args[0] !== "prompts" && args[0] !== "--prompts") {
+    return { kind: "error", message: "Usage: ritual [prompts|--prompts [--limit N]]" };
+  }
+
+  let limit = DEFAULT_PROMPT_DUMP_LIMIT;
+  for (let index = 1; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg !== "--limit" && arg !== "-n") {
+      return { kind: "error", message: "Usage: ritual prompts [--limit N]" };
+    }
+
+    const value = args[index + 1];
+    if (value === undefined) {
+      return { kind: "error", message: "Usage: ritual prompts [--limit N]" };
+    }
+    const parsedLimit = Number.parseInt(value, 10);
+    if (!Number.isSafeInteger(parsedLimit) || parsedLimit < 1 || `${parsedLimit}` !== value) {
+      return { kind: "error", message: "Prompt dump limit must be a positive integer." };
+    }
+    limit = parsedLimit;
+    index += 1;
+  }
+
+  return { kind: "prompts", limit };
 }
 
 export function isDirectEntrypoint(importMetaUrl: string, argv = process.argv): boolean {
