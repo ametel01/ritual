@@ -104,13 +104,6 @@ export async function runInteractiveSession(
     output.write(line);
   }
 
-  if (scan.prompts.length === 0) {
-    return {
-      status: "cancelled",
-      reason: "No user prompts were extracted from supported history.",
-    };
-  }
-
   const agentDiscovery = await selectAgentDiscoveredCandidate({
     prompts,
     output,
@@ -127,6 +120,12 @@ export async function runInteractiveSession(
   }
   if (agentDiscovery.status === "fallback") {
     output.write(agentDiscovery.reason);
+    if (scan.prompts.length === 0) {
+      return {
+        status: "cancelled",
+        reason: "No user prompts were extracted from supported history.",
+      };
+    }
   }
 
   const candidate =
@@ -272,6 +271,13 @@ async function selectAgentDiscoveredCandidate(options: {
   launcher: CommandLauncher;
   spinner: SpinnerFactory;
 }): Promise<CandidateDiscoverySelection> {
+  if (options.sources.length === 0) {
+    return {
+      status: "fallback",
+      reason: "No history sources were available for agent discovery.",
+    };
+  }
+
   const useAgentDiscovery = await options.prompts.confirm(
     "Use a local agent to inspect history for skill candidates?",
     true,

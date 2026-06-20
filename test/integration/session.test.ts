@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -233,5 +233,42 @@ describe("interactive session", () => {
     expect(result).toEqual({ status: "cancelled", reason: "No candidate was approved." });
     expect(launcher.invocations).toEqual([]);
     expect(outputs).toContain("Skipped 1 repeated workflow already covered by existing skills.");
+  });
+
+  it("can use agent discovery when local prompt extraction finds no prompts", async () => {
+    const cwd = await mkdtemp(path.join(os.tmpdir(), "ritual-session-cwd-"));
+    const homeDir = await mkdtemp(path.join(os.tmpdir(), "ritual-session-home-"));
+    const historyPath = path.join(cwd, "unsupported-but-readable.jsonl");
+    await writeFile(historyPath, `${JSON.stringify({ type: "metadata", value: "no prompt" })}\n`);
+
+    const runner = new MockRunner();
+    const claudePath = path.join(cwd, ".claude", "skills", "pr-review-workflow", "SKILL.md");
+    const launcher = new MockLauncher(claudePath);
+    const outputs: string[] = [];
+    const prompts = new QueuePrompts({
+      confirms: [true, true],
+      inputs: [historyPath, "pr-review-workflow"],
+      selects: ["codex", "claude", "agent-candidate-1", "project", "claude"],
+      checkboxes: [["claude"]],
+    });
+
+    const result = await runInteractiveSession({
+      cwd,
+      homeDir,
+      env: {},
+      prompts,
+      output: { write: (message) => outputs.push(message) },
+      fs: nodeFileSystem,
+      runner,
+      launcher,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(launcher.invocations).toHaveLength(2);
+    expect(launcher.invocations[0]?.invocation.args.at(-1)).toContain(
+      "Analyze local recorded Claude and Codex sessions",
+    );
+    await expect(readFile(claudePath, "utf8")).resolves.toContain("name: pr-review-workflow");
+    expect(outputs.some((line) => line.includes("Agent found 1 skill candidate"))).toBe(true);
   });
 });

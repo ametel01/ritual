@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Preserve Ritual's local repeated-workflow ranking as a fallback when agent discovery is declined, unavailable, fails, or returns no usable candidates.
+- Allow agent discovery to inspect readable session/history paths even when Ritual's local prompt extractor finds no user prompts.
 
 ## [0.2.0] - 2026-06-20
 
