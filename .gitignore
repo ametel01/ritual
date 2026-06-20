@@ -3,4 +3,5 @@ dist/
 coverage/
 *.tgz
 .ritual/
+twitter/
 .DS_Store
