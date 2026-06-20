@@ -464,6 +464,66 @@ describe("history parsers", () => {
     expect(result.diagnostics).toEqual([]);
   });
 
+  it("extracts user prompts from Codex response_item payload envelopes with plain injected string content", () => {
+    const result = parseCodexHistoryFile(
+      "/tmp/codex-plain.jsonl",
+      [
+        JSON.stringify({
+          timestamp: "2026-06-14T17:43:53.000Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            role: "user",
+            content: "<environment_context><cwd>/tmp/project</cwd></environment_context>",
+          },
+        }),
+        JSON.stringify({
+          timestamp: "2026-06-14T17:43:55.000Z",
+          type: "response_item",
+          payload: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "Generate a file named AGENTS.md that serves as a contributor guide for this repository.",
+              },
+            ],
+          },
+        }),
+      ].join("\n"),
+    );
+
+    expect(result.prompts.map((prompt) => prompt.text)).toEqual([
+      "Generate a file named AGENTS.md that serves as a contributor guide for this repository.",
+    ]);
+    expect(result.prompts[0]?.createdAt).toBe("2026-06-14T17:43:55.000Z");
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("extracts user prompts from Codex prompt history records with plain injected string text", () => {
+    const result = parseCodexHistoryFile(
+      "/tmp/history.jsonl",
+      [
+        JSON.stringify({
+          session_id: "019ec913-36c7-7363-8901-6286791eef1c",
+          ts: 1775423768,
+          text: "<skills_instructions>do not use this</skills_instructions>",
+        }),
+        JSON.stringify({
+          session_id: "019ec913-36c7-7363-8901-6286791eef1b",
+          ts: 1775423769,
+          text: "review this codebase for repeated workflows",
+        }),
+      ].join("\n"),
+    );
+
+    expect(result.prompts.map((prompt) => prompt.text)).toEqual([
+      "review this codebase for repeated workflows",
+    ]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
   it("extracts user prompts from Codex prompt history records", () => {
     const result = parseCodexHistoryFile(
       "/tmp/history.jsonl",

@@ -220,6 +220,9 @@ function isReusablePromptText(text: string): boolean {
   if (trimmed.length === 0 || trimmed.startsWith("/")) {
     return false;
   }
+  if (isInjectedContextText(trimmed)) {
+    return false;
+  }
   if (isSkillCallText(trimmed)) {
     return false;
   }
