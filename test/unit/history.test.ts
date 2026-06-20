@@ -603,6 +603,31 @@ describe("history discovery", () => {
     }
   });
 
+  it("stops discovery after the per-root file cap and warns", async () => {
+    const homeDir = await mkdtempInTest("ritual-history-home-");
+    const extraRoot = path.join(homeDir, "sessions");
+    await mkdir(extraRoot, { recursive: true });
+    await writeFile(path.join(extraRoot, "first.jsonl"), "{}", "utf8");
+    await writeFile(path.join(extraRoot, "second.jsonl"), "{}", "utf8");
+
+    const result = await discoverHistorySources({
+      cwd: "/tmp/project",
+      homeDir,
+      extraSources: [{ kind: "codex", path: extraRoot }],
+      maxFilesPerRoot: 1,
+    });
+
+    expect(result.sources).toEqual([{ kind: "codex", path: path.join(extraRoot, "first.jsonl") }]);
+    expect(
+      result.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.level === "warning" &&
+          diagnostic.sourcePath === extraRoot &&
+          diagnostic.message.includes("History discovery stopped after 1 supported files"),
+      ),
+    ).toBe(true);
+  });
+
   it("uses Claude prompt history and project transcripts as default Claude sources", async () => {
     const homeDir = await mkdtempInTest("ritual-history-home-");
     await mkdir(path.join(homeDir, ".claude", "projects", "-tmp-project"), {
@@ -780,6 +805,50 @@ describe("history scanning", () => {
         diagnostic.message.includes("Failed to read history source"),
       ),
     ).toBe(false);
+  });
+
+  it("skips oversized source files with warnings and preserves successful source results", async () => {
+    const homeDir = await mkdtempInTest("ritual-history-scan-");
+    const smallPath = path.join(homeDir, "small.jsonl");
+    const bigPath = path.join(homeDir, "big.jsonl");
+    await writeFile(smallPath, JSON.stringify({ ts: 1775423768, text: "review this PR" }), "utf8");
+    await writeFile(
+      bigPath,
+      JSON.stringify({
+        ts: 1775423768,
+        text: "review this PR, this file intentionally exceeds the test limit",
+      }),
+      "utf8",
+    );
+
+    const result = await scanHistorySources(
+      [
+        { kind: "codex", path: smallPath },
+        { kind: "codex", path: bigPath },
+      ],
+      { maxFileBytes: 10 },
+    );
+
+    expect(result.prompts.map((prompt) => prompt.text)).toEqual(["review this PR"]);
+    expect(
+      result.sources.find((source) => source.source.path === smallPath)?.prompts.length,
+    ).toBe(1);
+    expect(
+      result.sources.find((source) => source.source.path === bigPath)?.prompts,
+    ).toEqual([]);
+    expect(
+      result.sources
+        .find((source) => source.source.path === bigPath)
+        ?.diagnostics.some((diagnostic) => diagnostic.level === "warning"),
+    ).toBe(true);
+    expect(
+      result.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.level === "warning" &&
+          diagnostic.sourcePath === bigPath &&
+          diagnostic.message.includes("History source too large to read"),
+      ),
+    ).toBe(true);
   });
 });
 

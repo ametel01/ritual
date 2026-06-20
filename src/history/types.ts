@@ -44,4 +44,9 @@ export type HistoryDiscoveryOptions = {
   homeDir: string;
   env?: HistoryDiscoveryEnvironment;
   extraSources?: HistorySource[];
+  maxFilesPerRoot?: number;
+};
+
+export type HistoryScanOptions = {
+  maxFileBytes?: number;
 };

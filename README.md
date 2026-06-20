@@ -124,6 +124,9 @@ bun run pack:dry-run
   JSON/JSONL files exist in the default directories.
 - Unsupported history format: Ritual reports diagnostics and continues with other
   supported files.
+- Large history sources can be partially skipped by bounded discovery and scan caps;
+  use a narrower extra source and restart with a larger explicit option from code,
+  or place smaller history extracts in dedicated files.
 - Missing `claude` and `codex`: Ritual can still rank repeated prompts locally,
   but install one supported local agent executable before drafting.
 - Missing `$EDITOR`: Ritual continues with prompt-based review and validation.

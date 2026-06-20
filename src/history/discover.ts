@@ -5,6 +5,7 @@ import { parseCodexHistoryFile } from "./parse-codex.js";
 import type {
   Diagnostic,
   HistoryDiscoveryOptions,
+  HistoryScanOptions,
   HistoryScanResult,
   HistorySource,
   SourceScanResult,
@@ -12,6 +13,8 @@ import type {
 
 const HISTORY_EXTENSIONS = new Set([".json", ".jsonl"]);
 const DUPLICATE_PROMPT_WINDOW_MS = 60_000;
+const DEFAULT_MAX_FILES_PER_ROOT = 5_000;
+const DEFAULT_MAX_HISTORY_FILE_BYTES = 25 * 1024 * 1024;
 
 export async function discoverHistorySources(options: HistoryDiscoveryOptions): Promise<{
   sources: HistorySource[];
@@ -28,6 +31,7 @@ export async function discoverHistorySources(options: HistoryDiscoveryOptions): 
     { kind: "codex", path: path.join(codexHome, "archived_sessions") },
     ...(options.extraSources ?? []),
   ];
+  const maxFilesPerRoot = options.maxFilesPerRoot ?? DEFAULT_MAX_FILES_PER_ROOT;
 
   const sources: HistorySource[] = [];
   for (const candidate of candidates) {
@@ -41,7 +45,15 @@ export async function discoverHistorySources(options: HistoryDiscoveryOptions): 
     }
     let files: string[];
     try {
-      files = await discoverFiles(candidate.path);
+      const discovered = await discoverFiles(candidate.path, maxFilesPerRoot);
+      files = discovered.files;
+      if (discovered.truncated) {
+        diagnostics.push({
+          level: "warning",
+          message: `History discovery stopped after ${maxFilesPerRoot} supported files. Add a narrower extra source if needed.`,
+          sourcePath: candidate.path,
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown discovery error.";
       diagnostics.push({
@@ -70,12 +82,27 @@ export async function discoverHistorySources(options: HistoryDiscoveryOptions): 
   return { sources: [...deduped.values()], diagnostics };
 }
 
-export async function scanHistorySources(sources: HistorySource[]): Promise<HistoryScanResult> {
+export async function scanHistorySources(
+  sources: HistorySource[],
+  options: HistoryScanOptions = {},
+): Promise<HistoryScanResult> {
   const sourceResults: SourceScanResult[] = [];
   const diagnostics: Diagnostic[] = [];
+  const maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_HISTORY_FILE_BYTES;
 
   for (const source of sources) {
     try {
+      const stats = await stat(source.path);
+      if (stats.size > maxFileBytes) {
+        const diagnostic: Diagnostic = {
+          level: "warning",
+          message: `History source too large to read: ${source.path}`,
+          sourcePath: source.path,
+        };
+        sourceResults.push({ source, prompts: [], diagnostics: [diagnostic] });
+        diagnostics.push(diagnostic);
+        continue;
+      }
       const content = await readFile(source.path, "utf8");
       const parsed =
         source.kind === "claude"
@@ -179,26 +206,54 @@ function normalizePromptText(text: string): string {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-async function discoverFiles(rootPath: string): Promise<string[]> {
-  const rootStat = await stat(rootPath);
-  if (rootStat.isFile()) {
-    return HISTORY_EXTENSIONS.has(path.extname(rootPath)) ? [rootPath] : [];
-  }
+type DiscoveredFiles = {
+  files: string[];
+  truncated: boolean;
+};
 
-  const entries = await readdir(rootPath, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map(async (entry) => {
-      const entryPath = path.join(rootPath, entry.name);
+async function discoverFiles(rootPath: string, maxFiles: number): Promise<DiscoveredFiles> {
+  const files: string[] = [];
+  let truncated = false;
+
+  await discoverFilesRecursive(rootPath);
+  return { files: files.sort(), truncated };
+
+  async function discoverFilesRecursive(currentPath: string): Promise<void> {
+    if (files.length >= maxFiles) {
+      truncated = true;
+      return;
+    }
+
+    const currentStat = await stat(currentPath);
+    if (currentStat.isFile()) {
+      if (HISTORY_EXTENSIONS.has(path.extname(currentPath))) {
+        if (files.length < maxFiles) {
+          files.push(currentPath);
+        } else {
+          truncated = true;
+        }
+      }
+      return;
+    }
+
+    const entries = await readdir(currentPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (files.length >= maxFiles) {
+        truncated = true;
+        return;
+      }
+      const entryPath = path.join(currentPath, entry.name);
       if (entry.isDirectory()) {
-        return discoverFiles(entryPath);
+        await discoverFilesRecursive(entryPath);
+      } else if (entry.isFile() && HISTORY_EXTENSIONS.has(path.extname(entry.name))) {
+        if (files.length < maxFiles) {
+          files.push(entryPath);
+        } else {
+          truncated = true;
+        }
       }
-      if (entry.isFile() && HISTORY_EXTENSIONS.has(path.extname(entry.name))) {
-        return [entryPath];
-      }
-      return [];
-    }),
-  );
-  return nested.flat().sort();
+    }
+  }
 }
 
 async function exists(filePath: string): Promise<boolean> {
