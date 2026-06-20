@@ -44,6 +44,7 @@ src/
     cluster.ts
     rank.ts
   skills/
+    agent-discovery.ts
     draft.ts
     generation-template.ts
     validate.ts
@@ -66,7 +67,7 @@ Boundaries:
 - `cli/` owns terminal interaction only.
 - `history/` owns source discovery and parser resilience.
 - `prompts/` owns local-only normalization, clustering, and ranking.
-- `skills/` owns skill generation prompts, skill validation, target path resolution, and final writes.
+- `skills/` owns agent discovery prompts, skill generation prompts, skill validation, target path resolution, and final writes.
 - `system/` wraps side-effecting operations so they can be tested.
 - `telemetry/` owns local diagnostics output only; it must not upload data.
 
@@ -77,19 +78,21 @@ Running without arguments must run the complete guided flow:
 1. Discover Claude and Codex history sources.
 2. Show source diagnostics and extraction counts.
 3. Extract user prompts only.
-4. Normalize prompts.
-5. Cluster prompts locally.
-6. Rank repeated workflow candidates.
-7. Remove candidates already covered by existing project-local or global skills.
-8. Present candidates interactively.
-9. Let the user inspect, merge, rename, approve, or reject candidates.
-10. Recommend project-local or global scope.
-11. Ask the user to choose scope.
-12. Ask the user to choose Claude, Codex/agents, or both.
-13. Launch the selected local agent with the embedded generation template.
-14. The agent writes one `SKILL.md` directly to the first selected target.
-15. Validate the written skill.
-16. Mirror the same `SKILL.md` to any additional selected targets.
+4. Ask whether to use a local agent to inspect the discovered session/history paths for skill candidates.
+5. Launch the selected local agent with an analysis-only discovery template.
+6. Require the discovery agent to write structured JSON findings under `.ritual/sessions/`.
+7. Read the findings back into the same CLI session.
+8. Fall back to local normalization, clustering, and ranking when agent discovery is declined, unavailable, fails, or returns no usable candidates.
+9. Remove candidates already covered by existing project-local or global skills.
+10. Present candidates interactively.
+11. Let the user inspect, rename, approve, or reject candidates.
+12. Recommend project-local or global scope.
+13. Ask the user to choose scope.
+14. Ask the user to choose Claude, Codex/agents, or both.
+15. Launch the selected local agent with the embedded generation template.
+16. The agent writes one `SKILL.md` directly to the first selected target.
+17. Validate the written skill.
+18. Mirror the same `SKILL.md` to any additional selected targets.
 
 All runtime decisions must be interactive prompts.
 
@@ -195,12 +198,14 @@ Required unit coverage:
 - Scope recommendation.
 - Skill name sanitization.
 - Target path resolution.
+- Agent discovery handoff prompt and report parsing.
 - `SKILL.md` validation.
 - Overwrite protection.
 
 Required integration coverage:
 
 - End-to-end dry session using fixture history.
+- Agent discovery findings presented and selected inside the same CLI session.
 - Partial source failure with successful continuation.
 - No strong candidates path.
 - Near-miss threshold lowering.
@@ -238,9 +243,35 @@ type ExtractedPrompt = {
 };
 ```
 
-## Clustering And Ranking
+## Agent Discovery
 
-MVP clustering must be local-only.
+The primary interactive candidate discovery path uses a local agent executable after user approval.
+
+Rules:
+
+- Pass discovered Claude and Codex session/history paths to the selected local agent.
+- Use an embedded, versioned analysis-only template.
+- Tell the agent not to create `SKILL.md` files, ask user questions, or modify history files.
+- Require the agent to write one JSON object under `.ritual/sessions/`.
+- Parse the JSON as untrusted input.
+- Present parsed findings inside the same Ritual CLI session.
+- Let the user reject all findings without starting skill generation.
+- Fall back to local clustering and ranking when discovery is declined, unavailable, fails, or returns no usable candidates.
+
+Discovery JSON must contain a `candidates` array. Each candidate should include:
+
+- lowercase hyphen-case suggested name
+- summary
+- rationale
+- confidence
+- suggested scope
+- generalized representative prompts
+- source paths
+- repeat count when known
+
+## Local Clustering And Ranking
+
+Fallback clustering must be local-only.
 
 Recommended approach:
 
@@ -279,7 +310,7 @@ The template must require:
 - no unrelated auxiliary docs
 - no ecosystem-specific metadata files in the MVP
 
-The generated skill should be production-quality, not a stub. If the selected prompt cluster is too vague to draft a strong skill, Ritual should warn the user and offer to return to candidate selection.
+The generated skill should be production-quality, not a stub. If the selected candidate is too vague to draft a strong skill, Ritual should warn the user and offer to return to candidate selection.
 
 ## Direct Skill Write
 

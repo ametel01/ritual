@@ -31,21 +31,23 @@ Existing history tools help users inspect what happened. Existing skill generato
 - The primary artifact is one high-quality `SKILL.md`.
 - The user must approve before any skill is written.
 - History data stays local by default.
-- Candidate discovery is local-only in the MVP.
+- Agent discovery uses a user-selected local executable and returns findings to the same CLI session.
+- Local clustering remains available as a fallback candidate source.
 
 ## Goals
 
 - Scan local Claude and Codex history sources.
 - Extract user prompts only.
-- Cluster similar prompts into repeated workflow candidates.
-- Rank candidates by recurrence, coherence, and likely usefulness.
+- Let a user-selected local agent inspect discovered session/history paths for skill candidates.
+- Parse structured agent findings back into the CLI.
+- Fall back to local clustering and ranking by recurrence, coherence, and likely usefulness.
 - Present top candidates interactively.
-- Let the user approve, merge, rename, or reject candidates.
+- Let the user approve, rename, or reject candidates.
 - Let users dump the latest extracted prompts in terminal date order for inspection.
 - Generate one skill per run.
 - Use an embedded, versioned skill-generation prompt derived from `skill-creator`.
 - Call a local coding-agent executable, such as `claude` or `codex`, only after user approval.
-- Let the user edit the draft before final validation and write.
+- Let the selected agent write the approved skill directly to the first target path.
 - Validate generated skill drafts with built-in `SKILL.md` checks and, when available, `agnix`.
 - Write the same approved `SKILL.md` to Claude, Codex/agents, or both selected targets.
 
@@ -67,19 +69,20 @@ Existing history tools help users inspect what happened. Existing skill generato
 2. Ritual discovers local Claude and Codex history files.
 3. Ritual reports source-level diagnostics, including how many prompts were extracted from each source.
 4. Ritual extracts only user-authored prompts.
-5. Ritual normalizes and clusters similar prompts locally.
-6. Ritual ranks repeated workflow candidates.
-7. Ritual shows an interactive list of top candidates.
-8. The user opens candidate details and reviews representative prompts.
-9. The user can approve, merge, rename, or reject candidates.
-10. Ritual recommends whether the selected candidate appears project-specific or global.
-11. The user chooses project-local or global skill scope.
-12. The user chooses Claude, Codex/agents, or both output ecosystems.
-13. Ritual calls a local agent executable to write a skill for the approved candidate.
-14. The selected agent writes the `SKILL.md` directly to the first selected target path.
-15. Ritual validates the written skill and blocks on structural errors.
-16. Ritual mirrors the same `SKILL.md` to any additional selected target paths.
-17. Ritual prints the final paths.
+5. Ritual asks whether a local agent should inspect the discovered session/history paths for skill candidates.
+6. The selected local agent reads those paths and writes structured candidate findings back to Ritual.
+7. Ritual presents the findings inside the same CLI session.
+8. If agent discovery is declined, unavailable, fails, or returns no usable findings, Ritual falls back to local normalization, clustering, and ranking.
+9. The user opens candidate details and reviews representative examples.
+10. The user can approve, rename, or reject candidates.
+11. Ritual recommends whether the selected candidate appears project-specific or global.
+12. The user chooses project-local or global skill scope.
+13. The user chooses Claude, Codex/agents, or both output ecosystems.
+14. Ritual calls a local agent executable to write a skill for the approved candidate.
+15. The selected agent writes the `SKILL.md` directly to the first selected target path.
+16. Ritual validates the written skill and blocks on structural errors.
+17. Ritual mirrors the same `SKILL.md` to any additional selected target paths.
+18. Ritual prints the final paths.
 
 ## Functional Requirements
 
@@ -120,36 +123,44 @@ Existing history tools help users inspect what happened. Existing skill generato
 
 ### Clustering
 
-- Group similar user prompts into workflow candidates.
-- Use local-only clustering in the MVP.
+- Use local-only clustering as the fallback candidate source.
+- Group similar user prompts into workflow candidates when fallback ranking runs.
 - Support repeated prompts that are semantically similar but not identical.
 - Default strong-candidate threshold to 3 similar prompts.
 - Let the user interactively lower the threshold to 2 when results are sparse.
 - Keep representative examples for each cluster.
-- Allow the user to merge clusters during review.
 
 ### Ranking
 
-- Rank candidates by repeat count.
-- Rank candidates by cluster coherence.
+- Rank fallback candidates by repeat count.
+- Rank fallback candidates by cluster coherence.
 - Prefer candidates with enough prompt detail to produce a useful skill.
 - De-prioritize one-off, vague, or low-signal prompts.
 - Show the reason each candidate ranked highly.
 - If no candidate meets the strong threshold, show near-misses and do not generate by default.
 
+### Agent Discovery
+
+- Let the user choose whether a local agent should inspect discovered session/history paths.
+- Pass session/history paths to the selected local agent rather than a preselected prompt cluster.
+- Require the discovery agent to produce structured findings only.
+- Require findings to include suggested name, summary, rationale, confidence, suggested scope, representative generalized prompts, and source paths.
+- Read the findings back into Ritual and present them inside the same CLI session.
+- Do not let the discovery agent ask the user questions or create skill files.
+- Fall back to local clustering and ranking when agent discovery is declined, unavailable, fails, or returns no usable findings.
+
 ### Interactive Review
 
 - Display top repeated workflow candidates in the terminal.
-- Show candidate name, count, summary, rank reason, and representative prompts.
+- Show candidate name, count or confidence, summary, rationale, and representative prompts or examples.
 - Let the user approve one candidate.
 - Let the user reject candidates.
 - Let the user rename the approved candidate.
-- Let the user merge related candidates before drafting.
 - Generate at most one skill per run.
 
 ### Scope Selection
 
-- Recommend project-local or global scope based on the selected prompt cluster.
+- Recommend project-local or global scope based on the selected candidate.
 - Mark candidates as likely project-specific when prompts mention repo files, local commands, framework choices, CI, package managers, or project names.
 - Mark candidates as likely global when prompts are tool- or task-generic.
 - Require user confirmation of scope.
@@ -237,15 +248,14 @@ Warnings:
 - Treat local history as sensitive developer data.
 - Do not upload history by default.
 - Extract and process history locally.
-- Keep scan and cluster results ephemeral by default.
-- Ask interactively before saving any session data.
-- If saved, store review session data under `.ritual/sessions/` with clear contents.
-- Make agent invocation explicit because drafting may use external model services through the user's local agent configuration.
+- Keep scan and fallback cluster results ephemeral by default.
+- Store agent discovery reports under `.ritual/sessions/` only after the user chooses agent discovery.
+- Make agent invocation explicit because discovery and drafting may use external model services through the user's local agent configuration.
 
 ## Success Metrics
 
 - The user can create one valid reusable skill from repeated history in one interactive session.
-- The top ranked candidates contain workflows the user recognizes as repeated.
+- The presented candidates contain workflows the user recognizes as repeated or worth reusing.
 - The user can reject noise without editing files manually.
 - A generated skill passes structural validation.
 - The output path matches the selected scope and ecosystem targets.
@@ -255,14 +265,12 @@ Warnings:
 
 - Given local Claude and Codex history sources, Ritual extracts user prompts without assistant content.
 - Given one unsupported or malformed source, Ritual reports diagnostics and continues with any supported sources.
-- Given a set of repeated prompts, Ritual clusters them into visible workflow candidates locally.
-- Given clustered candidates, Ritual ranks and presents the top candidates interactively.
+- Given a selected local discovery agent, Ritual hands it session/history paths and reads structured findings back into the same CLI session.
+- Given agent discovery findings, Ritual presents candidates interactively before skill generation.
+- Given declined, unavailable, failed, or empty agent discovery, Ritual clusters repeated prompts locally and presents fallback candidates.
 - Given no strong candidate, Ritual shows near-misses and does not generate by default.
-- Given two similar candidates, the user can merge them before drafting.
 - Given an approved candidate, Ritual can invoke `claude` or `codex` locally to create a high-quality draft skill using the embedded skill-generation prompt.
-- Given a draft skill, the user can edit it before final validation.
 - Given a draft skill, Ritual blocks writes on structural validation failures.
-- Given warning-only validation results, Ritual lets the user decide whether to continue.
 - Given a valid approved draft, Ritual writes the same `SKILL.md` to Claude, Codex/agents, or both selected targets.
 - Given a run inside a repository, Ritual recommends project-local scope and both ecosystems by default.
 

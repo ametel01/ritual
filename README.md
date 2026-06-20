@@ -40,26 +40,30 @@ Running without arguments starts the interactive skill-generation flow.
 ## What The CLI Does
 
 1. Discovers supported Claude and Codex history files.
-2. Extracts user-authored prompts only.
-3. Normalizes, clusters, and ranks repeated workflow candidates locally.
-4. Lets the user choose one repeated workflow and preview matching local prompts.
-5. Recommends project-local or global skill scope.
-6. Lets the user choose Claude, Codex/agents, or both output ecosystems.
-7. Lets the user choose Claude Code or Codex for local skill generation.
-8. Opens the selected agent in the current terminal with the generated prompt.
-9. Writes the skill directly to the first selected target path.
-10. Validates the written skill with built-in checks and optional `agnix`.
-11. Mirrors the same approved `SKILL.md` to any additional selected targets.
+2. Extracts user-authored prompts only for diagnostics and local fallback ranking.
+3. Asks whether a local agent should inspect the discovered session/history paths for skill candidates.
+4. Opens the selected agent in the current terminal with an analysis-only discovery prompt.
+5. Reads the agent's structured findings back into the same CLI session.
+6. Lets the user choose one finding, or falls back to local repeated-workflow ranking when agent discovery is declined, unavailable, or unsuccessful.
+7. Recommends project-local or global skill scope.
+8. Lets the user choose Claude, Codex/agents, or both output ecosystems.
+9. Lets the user choose Claude Code or Codex for local skill generation.
+10. Opens the selected agent in the current terminal with the generated skill prompt.
+11. Writes the skill directly to the first selected target path.
+12. Validates the written skill with built-in checks and optional `agnix`.
+13. Mirrors the same approved `SKILL.md` to any additional selected targets.
 
 The `prompts` command skips candidate ranking and writes raw extracted user
 prompts to stdout as tab-separated `createdAt`, source, and prompt text fields.
 
 ## Privacy
 
-History discovery, extraction, clustering, and ranking are local-only. Ritual does
-not upload history. Skill generation uses a local `claude` or `codex` executable
-only after the user chooses it, because those tools may call external services
-depending on the user's configuration.
+History discovery, extraction, and fallback ranking are local-only. Ritual does
+not upload history itself. Agent discovery and skill generation use a local
+`claude` or `codex` executable only after the user chooses it, because those tools
+may call external services depending on the user's configuration. The discovery
+agent receives local session/history paths and writes structured findings under
+`.ritual/sessions/`.
 
 Tests use fixtures and temporary directories. They do not read real Claude or Codex
 history.
@@ -118,8 +122,8 @@ bun run pack:dry-run
   JSON/JSONL files exist in the default directories.
 - Unsupported history format: Ritual reports diagnostics and continues with other
   supported files.
-- Missing `claude` and `codex`: install one supported local agent executable before
-  drafting.
+- Missing `claude` and `codex`: Ritual can still rank repeated prompts locally,
+  but install one supported local agent executable before drafting.
 - Missing `$EDITOR`: Ritual continues with prompt-based review and validation.
 - Missing `agnix`: built-in validation still runs and is sufficient for MVP use.
 
