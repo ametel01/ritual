@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Install SIGINT/SIGTERM handlers only once in the CLI runtime.
 - Enforce selected skill name validation so generated `SKILL.md` names must match the chosen skill target.
 - Restore invalid primary skill writes by removing newly created targets or restoring overwritten targets after validation failure.
+- Add unit coverage for release note extraction CLI behavior, including missing sections and empty release entries.
 
 ## [0.3.0] - 2026-06-20
 

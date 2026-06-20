@@ -19,7 +19,7 @@ starting, honor its STOP conditions, and update the relevant row when done.
 | 009 | Continue history discovery after source errors | P1 | S | - | DONE |
 | 010 | Install runtime signal handlers once | P2 | S | - | DONE |
 | 011 | Enforce selected skill name validation | P2 | S | - | DONE |
-| 012 | Cover release notes extraction | P3 | S | - | TODO |
+| 012 | Cover release notes extraction | P3 | S | - | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
