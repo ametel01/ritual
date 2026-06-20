@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add an agent-led discovery pass that hands local session/history paths to the selected local agent, reads structured JSON findings back into the CLI, and lets the user choose which finding should become a skill inside the same Ritual session.
+
+### Changed
+
+- Preserve Ritual's local repeated-workflow ranking as a fallback when agent discovery is declined, unavailable, fails, or returns no usable candidates.
+
 ## [0.2.0] - 2026-06-20
 
 ### Added

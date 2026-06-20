@@ -2,6 +2,11 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ExtractedPrompt } from "../../src/history/types.js";
+import {
+  agentDiscoveryReportPath,
+  buildAgentDiscoveryHandoffPrompt,
+  parseAgentDiscoveryReport,
+} from "../../src/skills/agent-discovery.js";
 import { buildDraftInvocation, detectDraftExecutables } from "../../src/skills/draft.js";
 import { filterCoveredCandidates } from "../../src/skills/duplicates.js";
 import { buildGenerationHandoffPrompt } from "../../src/skills/generation-template.js";
@@ -143,6 +148,62 @@ describe("skill draft executables", () => {
     expect(prompt).toContain("/repo/.claude/skills/review-pr/SKILL.md");
     expect(prompt).toContain("Do not print the skill instead of writing the file.");
     expect(prompt).not.toContain("Return only the contents of SKILL.md.");
+  });
+});
+
+describe("agent discovery", () => {
+  it("builds a handoff prompt that asks the agent to write structured findings", () => {
+    const prompt = buildAgentDiscoveryHandoffPrompt({
+      cwd: "/repo",
+      reportPath: "/repo/.ritual/sessions/agent-discovery.json",
+      sources: [{ kind: "codex", path: "/home/user/.codex/sessions/session.jsonl" }],
+    });
+
+    expect(prompt).toContain("Analyze local recorded Claude and Codex sessions");
+    expect(prompt).toContain("[codex] /home/user/.codex/sessions/session.jsonl");
+    expect(prompt).toContain("Report path:");
+    expect(prompt).toContain("/repo/.ritual/sessions/agent-discovery.json");
+    expect(prompt).toContain('"candidates"');
+    expect(prompt).toContain("Do not create any SKILL.md files.");
+  });
+
+  it("parses agent discovery findings into workflow candidates", () => {
+    const result = parseAgentDiscoveryReport(
+      JSON.stringify({
+        candidates: [
+          {
+            name: "Review PR Workflow!",
+            summary: "Review pull requests for correctness and test coverage.",
+            rationale: "Several sessions asked for the same review workflow.",
+            confidence: "high",
+            scope: "project",
+            representativePrompts: [
+              "Review this TypeScript PR for correctness bugs and missing tests.",
+            ],
+            sourcePaths: ["/history.jsonl"],
+            repeatCount: 4,
+          },
+        ],
+      }),
+      [{ kind: "codex", path: "/history.jsonl" }],
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.candidates[0]).toMatchObject({
+      id: "agent-candidate-1",
+      name: "review-pr-workflow",
+      count: 4,
+      discoverySource: "agent",
+      confidence: "high",
+      recommendedScope: "project",
+    });
+    expect(result.candidates[0]?.representativePrompts[0]?.text).toContain("TypeScript PR");
+  });
+
+  it("uses a stable Ritual sessions path for discovery reports", () => {
+    expect(agentDiscoveryReportPath("/repo", new Date("2026-06-20T01:02:03.004Z"))).toBe(
+      path.join("/repo", ".ritual", "sessions", "agent-discovery-2026-06-20T01-02-03-004Z.json"),
+    );
   });
 });
 

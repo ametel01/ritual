@@ -1,4 +1,5 @@
 import * as os from "node:os";
+import * as path from "node:path";
 import { discoverHistorySources, scanHistorySources } from "../history/discover.js";
 import type { HistorySource } from "../history/types.js";
 import {
@@ -7,6 +8,11 @@ import {
   strongCandidates,
 } from "../prompts/rank.js";
 import type { WorkflowCandidate } from "../prompts/types.js";
+import {
+  agentDiscoveryReportPath,
+  launchAgentDiscovery,
+  parseAgentDiscoveryReport,
+} from "../skills/agent-discovery.js";
 import {
   buildDraftInvocation,
   type DraftExecutable,
@@ -105,17 +111,36 @@ export async function runInteractiveSession(
     };
   }
 
-  const allCandidates = await withSpinner(spinner, "Ranking repeated workflows...", () =>
-    rankWorkflowCandidatesAsync(scan.prompts),
-  );
-  const uncoveredCandidates = await removeCoveredCandidates({
-    candidates: allCandidates,
+  const agentDiscovery = await selectAgentDiscoveredCandidate({
+    prompts,
+    output,
+    sources,
     cwd,
     homeDir,
     fs,
-    output,
+    runner,
+    launcher,
+    spinner,
   });
-  const candidate = await reviewCandidates(prompts, output, uncoveredCandidates);
+  if (agentDiscovery.status === "cancelled") {
+    return { status: "cancelled", reason: "No candidate was approved." };
+  }
+  if (agentDiscovery.status === "fallback") {
+    output.write(agentDiscovery.reason);
+  }
+
+  const candidate =
+    agentDiscovery.status === "selected"
+      ? agentDiscovery.candidate
+      : await selectLocallyRankedCandidate({
+          prompts,
+          output,
+          scanPrompts: scan.prompts,
+          cwd,
+          homeDir,
+          fs,
+          spinner,
+        });
   if (candidate === undefined) {
     return { status: "cancelled", reason: "No candidate was approved." };
   }
@@ -123,7 +148,7 @@ export async function runInteractiveSession(
   const skillName = sanitizeSkillName(
     await prompts.input("Skill name", sanitizeSkillName(candidate.name)),
   );
-  const recommendedScope = recommendScope(candidate, cwd);
+  const recommendedScope = candidate.recommendedScope ?? recommendScope(candidate, cwd);
   const scope = await prompts.select<SkillScope>("Skill scope", [
     {
       name: `Project-local (${recommendedScope === "project" ? "recommended" : "available"})`,
@@ -231,6 +256,129 @@ async function removeCoveredCandidates(options: {
   return globalMatches.available;
 }
 
+type CandidateDiscoverySelection =
+  | { status: "selected"; candidate: WorkflowCandidate }
+  | { status: "fallback"; reason: string }
+  | { status: "cancelled" };
+
+async function selectAgentDiscoveredCandidate(options: {
+  prompts: PromptAdapter;
+  output: Output;
+  sources: HistorySource[];
+  cwd: string;
+  homeDir: string;
+  fs: FileSystem;
+  runner: CommandRunner;
+  launcher: CommandLauncher;
+  spinner: SpinnerFactory;
+}): Promise<CandidateDiscoverySelection> {
+  const useAgentDiscovery = await options.prompts.confirm(
+    "Use a local agent to inspect history for skill candidates?",
+    true,
+  );
+  if (!useAgentDiscovery) {
+    return { status: "fallback", reason: "Using Ritual's local repeated-workflow ranking." };
+  }
+
+  const executable = await chooseDiscoveryExecutable(options.prompts, options.runner);
+  if (executable === undefined) {
+    return {
+      status: "fallback",
+      reason:
+        "No local agent executable was found, so Ritual is using local repeated-workflow ranking.",
+    };
+  }
+
+  const reportPath = agentDiscoveryReportPath(options.cwd);
+  await options.fs.ensureDir(path.dirname(reportPath));
+  const invocationPreview = previewInvocation(executable);
+  options.output.write(`Discovery report: ${reportPath}`);
+  options.output.write(`Agent command: ${invocationPreview} <generated discovery prompt>`);
+
+  const exitCode = await launchAgentDiscovery({
+    cwd: options.cwd,
+    sources: options.sources,
+    reportPath,
+    executable,
+    launcher: options.launcher,
+  });
+  if (exitCode !== 0) {
+    return {
+      status: "fallback",
+      reason: `Discovery agent exited with code ${exitCode}, so Ritual is using local repeated-workflow ranking.`,
+    };
+  }
+
+  let reportContent: string;
+  try {
+    reportContent = await options.fs.readText(reportPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown read error";
+    return {
+      status: "fallback",
+      reason: `Discovery agent did not write a readable report (${message}), so Ritual is using local repeated-workflow ranking.`,
+    };
+  }
+
+  const parsed = parseAgentDiscoveryReport(reportContent, options.sources);
+  for (const warning of parsed.warnings) {
+    options.output.write(`[warning] ${warning}`);
+  }
+  if (parsed.candidates.length === 0) {
+    return {
+      status: "fallback",
+      reason:
+        "Discovery agent did not return skill candidates, so Ritual is using local repeated-workflow ranking.",
+    };
+  }
+
+  const uncoveredCandidates = await removeCoveredCandidates({
+    candidates: parsed.candidates,
+    cwd: options.cwd,
+    homeDir: options.homeDir,
+    fs: options.fs,
+    output: options.output,
+  });
+  if (uncoveredCandidates.length === 0) {
+    return {
+      status: "fallback",
+      reason:
+        "All agent-discovered candidates are already covered by existing skills, so Ritual is using local repeated-workflow ranking.",
+    };
+  }
+
+  options.output.write(
+    `Agent found ${uncoveredCandidates.length} skill candidate${uncoveredCandidates.length === 1 ? "" : "s"}.`,
+  );
+  const candidate = await reviewCandidates(options.prompts, options.output, uncoveredCandidates);
+  if (candidate === undefined) {
+    return { status: "cancelled" };
+  }
+  return { status: "selected", candidate };
+}
+
+async function selectLocallyRankedCandidate(options: {
+  prompts: PromptAdapter;
+  output: Output;
+  scanPrompts: Parameters<typeof rankWorkflowCandidatesAsync>[0];
+  cwd: string;
+  homeDir: string;
+  fs: FileSystem;
+  spinner: SpinnerFactory;
+}): Promise<WorkflowCandidate | undefined> {
+  const allCandidates = await withSpinner(options.spinner, "Ranking repeated workflows...", () =>
+    rankWorkflowCandidatesAsync(options.scanPrompts),
+  );
+  const uncoveredCandidates = await removeCoveredCandidates({
+    candidates: allCandidates,
+    cwd: options.cwd,
+    homeDir: options.homeDir,
+    fs: options.fs,
+    output: options.output,
+  });
+  return reviewCandidates(options.prompts, options.output, uncoveredCandidates);
+}
+
 async function askForExtraSources(prompts: PromptAdapter): Promise<HistorySource[]> {
   const addExtra = await prompts.confirm("Add an extra history file or directory?", false);
   if (!addExtra) {
@@ -288,10 +436,22 @@ async function reviewCandidates(
 
 function showCandidate(output: Output, candidate: WorkflowCandidate): void {
   output.write(`Suggested skill name: ${candidate.name}`);
-  output.write(`Found ${candidate.count} similar prompt${candidate.count === 1 ? "" : "s"}.`);
+  if (candidate.discoverySource === "agent") {
+    output.write(`Agent confidence: ${candidate.confidence ?? "unknown"}.`);
+  } else {
+    output.write(`Found ${candidate.count} similar prompt${candidate.count === 1 ? "" : "s"}.`);
+  }
   output.write(`What it looks like: ${candidate.summary}`);
-  output.write(`Confidence: ${candidate.isStrong ? "good" : "possible"}`);
-  output.write("Matching prompts found locally:");
+  output.write(
+    candidate.discoverySource === "agent"
+      ? `Why it may be worth a skill: ${candidate.rankReason}`
+      : `Confidence: ${candidate.isStrong ? "good" : "possible"}`,
+  );
+  output.write(
+    candidate.discoverySource === "agent"
+      ? "Representative workflow examples:"
+      : "Matching prompts found locally:",
+  );
   for (const prompt of candidate.representativePrompts) {
     output.write(`- ${prompt.text}`);
   }
@@ -305,9 +465,30 @@ function candidateMenuLabel(candidate: WorkflowCandidate): string {
 }
 
 function candidateMenuDescription(candidate: WorkflowCandidate): string {
+  if (candidate.discoverySource === "agent") {
+    return `Agent confidence: ${candidate.confidence ?? "unknown"}.`;
+  }
   return candidate.isStrong
     ? "Ritual saw this pattern several times."
     : "Ritual saw this pattern twice.";
+}
+
+async function chooseDiscoveryExecutable(
+  prompts: PromptAdapter,
+  runner: CommandRunner,
+): Promise<DraftExecutable | undefined> {
+  const availableExecutables = await detectDraftExecutables(runner);
+  if (availableExecutables.length === 0) {
+    return undefined;
+  }
+
+  return prompts.select<DraftExecutable>("Analyze history with", [
+    ...availableExecutables.map((executable) => ({
+      name: draftExecutableLabel(executable),
+      value: executable,
+      description: `Run ${draftExecutableCommand(executable)} locally with the discovery prompt`,
+    })),
+  ]);
 }
 
 async function chooseDraftExecutable(

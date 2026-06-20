@@ -80,6 +80,34 @@ class MockLauncher implements CommandLauncher {
 
   async launch(invocation: CommandInvocation, options: { cwd: string }): Promise<number> {
     this.invocations.push({ invocation, cwd: options.cwd });
+    const prompt = invocation.args.at(-1) ?? "";
+    const reportPath = discoveryReportPath(prompt);
+    if (reportPath !== undefined) {
+      await nodeFileSystem.writeTextAtomic(
+        reportPath,
+        JSON.stringify({
+          candidates: [
+            {
+              name: "pr-review-workflow",
+              summary: "Review TypeScript pull requests for correctness and test coverage.",
+              rationale:
+                "Multiple recorded sessions ask for the same pull request review workflow.",
+              confidence: "high",
+              scope: "project",
+              representativePrompts: [
+                "Review this TypeScript PR for correctness bugs and missing Vitest tests.",
+                "Please review this TypeScript pull request for bugs and missing tests.",
+                "Review this TypeScript PR for CI risks, bugs, and missing coverage.",
+              ],
+              sourcePaths: [path.join(options.cwd, "history.jsonl")],
+              repeatCount: 3,
+            },
+          ],
+        }),
+      );
+      return 0;
+    }
+
     await nodeFileSystem.writeTextAtomic(
       this.skillPath,
       [
@@ -99,6 +127,11 @@ class MockLauncher implements CommandLauncher {
   }
 }
 
+function discoveryReportPath(prompt: string): string | undefined {
+  const match = /Report path:\n(.+)\n\nTask:/u.exec(prompt);
+  return match?.[1];
+}
+
 describe("interactive session", () => {
   it("runs the happy path without touching real history or skill roots", async () => {
     const cwd = await mkdtemp(path.join(os.tmpdir(), "ritual-session-cwd-"));
@@ -115,9 +148,9 @@ describe("interactive session", () => {
     const launcher = new MockLauncher(claudePath);
     const outputs: string[] = [];
     const prompts = new QueuePrompts({
-      confirms: [true],
+      confirms: [true, true],
       inputs: [fixturePath, "pr-review-workflow"],
-      selects: ["codex", "candidate-1", "project", "claude"],
+      selects: ["codex", "claude", "agent-candidate-1", "project", "claude"],
       checkboxes: [["claude", "codex"]],
     });
 
@@ -133,19 +166,24 @@ describe("interactive session", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(launcher.invocations).toHaveLength(1);
+    expect(launcher.invocations).toHaveLength(2);
     expect(launcher.invocations[0]?.invocation.command).toBe("claude");
     expect(launcher.invocations[0]?.invocation.args[0]).toBe("--dangerously-skip-permissions");
     expect(launcher.invocations[0]?.invocation.args.at(-1)).toContain(
+      "Analyze local recorded Claude and Codex sessions",
+    );
+    expect(launcher.invocations[1]?.invocation.args.at(-1)).toContain(
       "Create exactly one reusable agent skill and write it directly to this file:",
     );
     expect(launcher.invocations[0]?.cwd).toBe(cwd);
+    expect(launcher.invocations[1]?.cwd).toBe(cwd);
 
     const codexPath = path.join(cwd, ".agents", "skills", "pr-review-workflow", "SKILL.md");
     await expect(readFile(claudePath, "utf8")).resolves.toContain("name: pr-review-workflow");
     await expect(readFile(codexPath, "utf8")).resolves.toContain("name: pr-review-workflow");
     expect(outputs.some((line) => line.includes("found 3 user prompts"))).toBe(true);
-    expect(outputs.some((line) => line.includes("Matching prompts found locally"))).toBe(true);
+    expect(outputs.some((line) => line.includes("Agent found 1 skill candidate"))).toBe(true);
+    expect(outputs.some((line) => line.includes("Representative workflow examples"))).toBe(true);
     expect(outputs.some((line) => line.toLowerCase().includes("draft"))).toBe(false);
   });
 
@@ -175,7 +213,7 @@ describe("interactive session", () => {
     const launcher = new MockLauncher(path.join(cwd, "unused", "SKILL.md"));
     const outputs: string[] = [];
     const prompts = new QueuePrompts({
-      confirms: [true],
+      confirms: [true, false],
       inputs: [fixturePath],
       selects: ["codex"],
       checkboxes: [],

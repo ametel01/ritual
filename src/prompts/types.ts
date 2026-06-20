@@ -17,6 +17,9 @@ export type WorkflowCandidate = {
   rankScore: number;
   rankReason: string;
   isStrong: boolean;
+  discoverySource?: "local" | "agent";
+  confidence?: "high" | "medium" | "low";
+  recommendedScope?: "project" | "global";
 };
 
 export type ClusterOptions = {
