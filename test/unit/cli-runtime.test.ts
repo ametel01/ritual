@@ -86,7 +86,7 @@ describe("cli runtime", () => {
     expect(stdout).toContain(formatHelp());
     expect(called).toEqual([]);
     expect(exitCodes).toEqual([]);
-    expect(stdin.unrefCalls).toBe(2);
+    expect(stdin.unrefCalls).toBe(1);
   });
 
   it("prints help for normalized bare help", async () => {
@@ -254,6 +254,33 @@ describe("cli runtime", () => {
     const increasedSigterm = process.listenerCount("SIGTERM") - baselineSigterm;
     expect(increasedSigint).toBeLessThanOrEqual(1);
     expect(increasedSigterm).toBeLessThanOrEqual(1);
+  });
+
+  it("guards the shared stdin stream only once and still unrefs each run", async () => {
+    const stdin = new FakeStdin();
+    const baselineError = stdin.listenerCount("error");
+
+    await runCli({
+      argv: ["node", "ritual"],
+      stdin,
+      output: { stdout: () => undefined, stderr: () => undefined },
+      setExitCode: () => undefined,
+      async runInteractive(): Promise<SessionResult> {
+        return { status: "cancelled", reason: "done" };
+      },
+    });
+    await runCli({
+      argv: ["node", "ritual"],
+      stdin,
+      output: { stdout: () => undefined, stderr: () => undefined },
+      setExitCode: () => undefined,
+      async runInteractive(): Promise<SessionResult> {
+        return { status: "cancelled", reason: "done" };
+      },
+    });
+
+    expect(stdin.listenerCount("error") - baselineError).toBeLessThanOrEqual(1);
+    expect(stdin.unrefCalls).toBe(2);
   });
 
   it("funnels unexpected top-level errors through a stable Ritual message", async () => {

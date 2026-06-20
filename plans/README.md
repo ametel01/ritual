@@ -23,7 +23,7 @@ relevant row when done.
 | 012 | Cover release notes extraction | P3 | S | - | DONE |
 | 013 | Filter injected context at the final prompt boundary | P1 | S | - | DONE |
 | 014 | Bound history discovery and parsing work | P1 | M | 013 | TODO |
-| 015 | Make the CLI stdin lifecycle idempotent | P2 | S | - | TODO |
+| 015 | Make the CLI stdin lifecycle idempotent | P2 | S | - | DONE |
 | 016 | Resolve the agent discovery contract in the docs | P2 | S | - | TODO |
 | 017 | Spike a bounded local history index or cache strategy | P3 | M | 013, 014 | TODO |
 | 018 | Tighten existing-skill duplicate scoring | P2 | M | - | TODO |

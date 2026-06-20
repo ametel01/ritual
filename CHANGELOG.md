@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - Filter injected runtime context that was previously bypassing the final reusable prompt boundary for plain string history content and prompt-history text values.
+- Make CLI stdin guarding idempotent across repeated `runCli` calls and avoid double stdin unref on help.
 
 ## [0.3.1] - 2026-06-20
 

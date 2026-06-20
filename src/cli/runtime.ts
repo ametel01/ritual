@@ -7,6 +7,7 @@ import { isPromptCancelledError } from "./prompts.js";
 
 const DEFAULT_PROMPT_DUMP_LIMIT = 100;
 let gracefulExitHandlersInstalled = false;
+const guardedStdin = new WeakSet<RuntimeStdin>();
 
 export type CliOutput = {
   stdout(message: string): void;
@@ -55,7 +56,6 @@ export async function runCli(options: RunCliOptions = {}): Promise<void> {
   try {
     if (command.kind === "help") {
       output.stdout(formatHelp());
-      unrefStdin(stdin);
       return;
     }
     if (command.kind === "prompts") {
@@ -167,6 +167,10 @@ function unrefStdin(stdin: RuntimeStdin): void {
 }
 
 function guardStdin(stdin: RuntimeStdin): void {
+  if (guardedStdin.has(stdin)) {
+    return;
+  }
+  guardedStdin.add(stdin);
   stdin.on("error", (error) => {
     if (isNodeError(error) && error.code === "EIO") {
       return;
