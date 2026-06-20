@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { discoverHistorySources, scanHistorySources } from "../../src/history/discover.js";
@@ -512,6 +512,37 @@ describe("history parsers", () => {
 });
 
 describe("history discovery", () => {
+  it("continues discovery when one source cannot be traversed", async () => {
+    const homeDir = await mkdtempInTest("ritual-history-home-");
+    await mkdir(path.join(homeDir, ".codex"), { recursive: true });
+    await writeFile(path.join(homeDir, ".codex", "history.jsonl"), "", "utf8");
+    const blockedSource = path.join(homeDir, ".codex", "blocked");
+    await mkdir(blockedSource, { recursive: true });
+    await chmod(blockedSource, 0o000);
+
+    try {
+      const result = await discoverHistorySources({
+        cwd: "/tmp/project",
+        homeDir,
+        extraSources: [{ kind: "codex", path: blockedSource }],
+      });
+
+      expect(result.sources).toEqual([
+        { kind: "codex", path: path.join(homeDir, ".codex", "history.jsonl") },
+      ]);
+      expect(
+        result.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.level !== "info" &&
+            diagnostic.sourcePath === blockedSource &&
+            diagnostic.message.startsWith("Failed to discover history path"),
+        ),
+      ).toBe(true);
+    } finally {
+      await chmod(blockedSource, 0o700);
+    }
+  });
+
   it("uses Claude prompt history and project transcripts as default Claude sources", async () => {
     const homeDir = await mkdtempInTest("ritual-history-home-");
     await mkdir(path.join(homeDir, ".claude", "projects", "-tmp-project"), {

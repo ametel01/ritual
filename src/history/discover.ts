@@ -39,7 +39,18 @@ export async function discoverHistorySources(options: HistoryDiscoveryOptions): 
       });
       continue;
     }
-    const files = await discoverFiles(candidate.path);
+    let files: string[];
+    try {
+      files = await discoverFiles(candidate.path);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown discovery error.";
+      diagnostics.push({
+        level: "error",
+        message: `Failed to discover history path: ${message}`,
+        sourcePath: candidate.path,
+      });
+      continue;
+    }
     if (files.length === 0) {
       diagnostics.push({
         level: "warning",

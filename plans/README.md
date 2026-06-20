@@ -16,7 +16,7 @@ starting, honor its STOP conditions, and update the relevant row when done.
 | 006 | Show interactive warning diagnostics | P2 | S | - | DONE |
 | 007 | Offer extra history source when defaults exist | P2 | M | - | DONE |
 | 008 | Restore invalid primary skill writes | P1 | M | - | DONE |
-| 009 | Continue history discovery after source errors | P1 | S | - | TODO |
+| 009 | Continue history discovery after source errors | P1 | S | - | DONE |
 | 010 | Install runtime signal handlers once | P2 | S | - | TODO |
 | 011 | Enforce selected skill name validation | P2 | S | - | TODO |
 | 012 | Cover release notes extraction | P3 | S | - | TODO |
